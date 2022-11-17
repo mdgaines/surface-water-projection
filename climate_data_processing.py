@@ -98,18 +98,24 @@ def save_studyArea_avg(clipped, model, rcpX, var_short):
     filename = filename.replace('_','-')
     filename = filename.replace(';','_')
 
-    sa_monthly_dict = {}
+    outpath = f'../data/ClimateData/macav2livneh_studyArea_avgs/{filename}'
 
-    for i in range(len(clipped.time)):
-        date = str(clipped[i].time.values).split(' ')[0]
-        sa_mean = np.nanmean(clipped[i])
+    if not os.path.exists(outpath):
 
-        sa_monthly_dict[date] = sa_mean
-    
-    df = pd.DataFrame(sa_monthly_dict.values(), index=sa_monthly_dict.keys()).reset_index()
-    df.columns = ['DATE', var_short + '_AVG']
+        sa_monthly_dict = {}
 
-    df.to_csv(f'../data/ClimateData/macav2livneh_studyArea_avgs/{filename}')
+        for i in range(len(clipped.time)):
+            date = str(clipped[i].time.values).split(' ')[0]
+            sa_mean = np.nanmean(clipped[i])
+
+            sa_monthly_dict[date] = sa_mean
+        
+        df = pd.DataFrame(sa_monthly_dict.values(), index=sa_monthly_dict.keys()).reset_index()
+        df.columns = ['DATE', var_short + '_AVG']
+
+        df.to_csv(outpath)
+
+    return()
 
 
 def save_zonal_avg(clipped, idx, huc_bounds, huc8_reproj, huc_mask, var_long, var_short, nc_path, model, rcpX):
@@ -131,25 +137,29 @@ def save_zonal_avg(clipped, idx, huc_bounds, huc8_reproj, huc_mask, var_long, va
     else:
         print('error')
 
-    # get seasonal average of climate variable
-    szn_avg = (clipped[idx] + clipped[idx+1] + clipped[idx+2]) / 3
-    
-    # Subset the data - this is now a dataarray rather than a DataSet
-    clipped_sub = szn_avg.sel(
-        lon=slice(huc_bounds["lon"][0], huc_bounds["lon"][1]),
-        lat=slice(huc_bounds["lat"][0], huc_bounds["lat"][1])).where(huc_mask)
-
-    zs = clipped_sub.groupby("region").mean(["lat", "lon"]).to_dataframe()
-    zs['huc8'] = huc8_reproj['huc8']
-    zs['YEAR'] = yr
-    zs['SEASON'] = szn
-    zs.rename(columns={var_long:'AVG_'+var_short}, inplace=True)
-
     output = f'{os.path.dirname(nc_path)}/zonal_avg/{model}_{rcpX}_{yr}_{szn}_{var_short}_AVG.csv'
 
     if not os.path.exists(output):
         if not os.path.exists(f'{os.path.dirname(nc_path)}/zonal_avg'):
             os.mkdir(f'{os.path.dirname(nc_path)}/zonal_avg')
+
+        if var_short == 'PRECIP': # get seasonal sum for precip (NC data already monthly sum)
+            szn_avg = clipped[idx] + clipped[idx+1] + clipped[idx+2]
+        else:
+            # get seasonal average of climate variable
+            szn_avg = (clipped[idx] + clipped[idx+1] + clipped[idx+2]) / 3
+        
+        # Subset the data - this is now a dataarray rather than a DataSet
+        clipped_sub = szn_avg.sel(
+            lon=slice(huc_bounds["lon"][0], huc_bounds["lon"][1]),
+            lat=slice(huc_bounds["lat"][0], huc_bounds["lat"][1])).where(huc_mask)
+
+        zs = clipped_sub.groupby("region").mean(["lat", "lon"]).to_dataframe()
+        zs['huc8'] = huc8_reproj['huc8']
+        zs['YEAR'] = yr
+        zs['SEASON'] = szn
+        zs.rename(columns={var_long:'AVG_'+var_short}, inplace=True)
+
         zs.to_csv(output)
         print(f'{model}_{rcpX}_{yr}_{szn}_{var_short}_AVG.csv saved.')
 
