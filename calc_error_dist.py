@@ -89,6 +89,42 @@ def mk_diff_csv(gridmet_path=str, src_path=str, src=str, szn=str, var=str, scn=s
     return()
 
 
+def save_error_png(outpath=str, diff_path = str, dist=True):
+
+    if not os.path.exists(outpath):
+        if not os.path.exists(os.path.dirname(outpath)):
+            if not os.path.exists(os.path.dirname(os.path.dirname(outpath))):
+                if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))):
+                    if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))):
+                        if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))))):
+                            os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))))
+                        os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))))
+                    os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))
+                os.mkdir(os.path.dirname(os.path.dirname(outpath)))
+            os.mkdir(os.path.dirname(outpath))
+
+        diff_df = pd.read_csv(diff_path, index_col='huc8')
+        if dist:
+            fig, ax1 = plt.subplots(figsize=(12, 8))
+            diff_df.stack().hist(ax=ax1, bins=20)
+            ax1.set_title(os.path.basename(diff_path)[:-4], fontsize=14)
+            ax1.set_xlabel('PROJ - OBS', fontsize=12)
+            ax1.set_ylabel('Count', fontsize=12)
+            fig.savefig(outpath, bbox_inches='tight', facecolor='white')
+
+        else:
+            fig, ax1 = plt.subplots(figsize=(12, 8))
+            diff_df.T.plot(ax=ax1)
+            ax1.set_title(os.path.basename(diff_path)[:-4], fontsize=14)
+            ax1.set_xlabel('Year', fontsize=12)
+            ax1.set_ylabel('PROJ - OBS', fontsize=12)
+            ax1.legend(fontsize=10)
+            fig.savefig(outpath, bbox_inches='tight', facecolor='white')
+
+        plt.close(fig)
+
+    return()
+
 ### MAIN ###
 # 1) make all CSVs OBS and PROJ
 # 2) calculate diff between obs and proj and save to csv
@@ -153,3 +189,24 @@ def main():
     ###############################################
     #### make plots ####
     ###############################################
+    huc4_lst = ['3150', '3160', '3140', '8020', '8040', '3100', '3090', '3080',
+                '3110', '3130', '3060', '3070', '3120', '8090', '8080', '8070',
+                '8050', '8060', '3180', '8030', '3170', '3040', '3030', '3020',
+                '3010', '3050', '6010', '6020', '8010', '6040', '6030']
+    for huc4 in huc4_lst:
+        huc4_diff_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/*/*/*{huc4}*.csv')
+        for huc4_diff_path in huc4_diff_lst:
+            info_lst = os.path.basename(huc4_diff_path)[:-4].split('_')
+            src = info_lst[0] # data source (GFDL, etc.)
+            szn = info_lst[1] # season (SPRING, SUMMER, FALL, WINTER for GCMs)
+            if 'TEMP' in huc4_diff_path:
+                var = '_'.join([info_lst[2], info_lst[3]])
+            else:
+                var = info_lst[2] # variable (PRECIP, MAX_TEMP, MIN_TEMP for GCMs)
+            scn = info_lst[-2] # scenario (HISTORICAL, RCP45, RCP85 for GCMs)
+            
+            outpath = f'../imgs/Paper2/error_temporal/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_temporal.png'    
+            save_error_png(outpath, huc4_diff_path, dist=False)
+
+            outpath = f'../imgs/Paper2/error_dist/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_dist.png'    
+            save_error_png(outpath, huc4_diff_path, dist=True)
