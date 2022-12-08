@@ -2,9 +2,31 @@ import os
 import pandas as pd
 import numpy as np
 from glob import glob
+import seaborn as sns
+from scipy.stats import pearsonr
+import json
 
 import matplotlib.pyplot as plt
 
+
+# function to add to JSON modified from https://www.geeksforgeeks.org/append-to-json-file-using-python/
+def write_json(new_data=dict, filename=str, new_json=bool):
+
+    if new_json:
+        origin_dict = {"bivariate_info": [new_data]}
+        with open(filename, 'w') as file:
+            json.dump(origin_dict, file) 
+    else:
+        with open(filename,'r+') as file:
+            # First we load existing data into a dict.
+            file_data = json.load(file)
+            # Join new_data with file_data inside emp_details
+            file_data["bivariate_info"].append(new_data)
+            # Sets file's current position at offset.
+            file.seek(0)
+            # convert back to json.
+            json.dump(file_data, file, indent = 4)
+    return
 
 
 def mk_year_season_csv(outpath = str):
@@ -67,13 +89,8 @@ def mk_diff_csv(gridmet_path=str, src_path=str, src=str, szn=str, var=str, scn=s
     for outpath in outpath_lst:
         if not os.path.exists(outpath):
             if not os.path.exists(os.path.dirname(outpath)):
-                if not os.path.exists(os.path.dirname(os.path.dirname(outpath))):
-                    if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))):
-                        if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))):
-                            os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))))
-                        os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))
-                    os.mkdir(os.path.dirname(os.path.dirname(outpath)))
-                os.mkdir(os.path.dirname(outpath))
+                os.makedirs(os.path.dirname(outpath), exist_ok=True)
+
             huc4 = outpath[:-4].split('_')[-1]  # get huc4 name
             gridmet_huc_df = gridmet_df[gridmet_df['huc4']==huc4]   # get gridmet data for huc4
             gridmet_huc_df = gridmet_huc_df.set_index('huc8')
@@ -93,15 +110,7 @@ def save_error_png(outpath=str, diff_path = str, dist=True):
 
     if not os.path.exists(outpath):
         if not os.path.exists(os.path.dirname(outpath)):
-            if not os.path.exists(os.path.dirname(os.path.dirname(outpath))):
-                if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))):
-                    if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))):
-                        if not os.path.exists(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))))):
-                            os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))))
-                        os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(outpath)))))
-                    os.mkdir(os.path.dirname(os.path.dirname(os.path.dirname(outpath))))
-                os.mkdir(os.path.dirname(os.path.dirname(outpath)))
-            os.mkdir(os.path.dirname(outpath))
+            os.makedirs(os.path.dirname(outpath), exist_ok=True)
 
         diff_df = pd.read_csv(diff_path, index_col='huc8')
         if dist:
@@ -125,17 +134,83 @@ def save_error_png(outpath=str, diff_path = str, dist=True):
 
     return()
 
+
+def calc_error_correlation(precip_path=str, mxTemp_path=str, png_outpath=str, \
+                           src=str, szn=str, scn=str, huc4=str):
+    '''
+        Only for MaxTemp and Precip. We can look into MinTemp and tri-variate correlation another day.
+    '''
+    bivar_json_path = f'../data/ClimateData/macav2livneh_GRIDMET_bivar_JSONs/{src}/{szn}/{src}_{szn}_PREICP_MAXT_BIVAR_{scn}.json'
+    new_json= False
+    if not os.path.exists(bivar_json_path):
+        if not os.path.exists(os.path.dirname(bivar_json_path)):
+            os.makedirs(os.path.dirname(bivar_json_path), exist_ok=True)
+        new_json = True
+
+    precip = pd.read_csv(precip_path)
+    new_precip_df = pd.DataFrame()
+    precip = precip.set_index('huc8')
+    new_precip_df['HUC_YR'] = ['_'.join([str(i), yr]) for i in precip.index for yr in precip.columns]
+    new_precip_df['PRECIP_ERROR'] = precip.stack().values
+
+    mxtemp = pd.read_csv(mxTemp_path)
+    new_mxtemp_df = pd.DataFrame()
+    mxtemp = mxtemp.set_index('huc8')
+    new_mxtemp_df['HUC_YR'] = ['_'.join([str(i), yr]) for i in mxtemp.index for yr in mxtemp.columns]
+    new_mxtemp_df['MAX_TEMP_ERROR'] = mxtemp.stack().values
+
+    joint_df = new_precip_df.merge(new_mxtemp_df, on='HUC_YR')
+
+    rho, p_val = pearsonr(joint_df.PRECIP_ERROR, joint_df.MAX_TEMP_ERROR)
+
+    json_dict = {'HUC04':huc4}
+
+    mu_x = joint_df.PRECIP_ERROR.mean()
+    sigma_x = joint_df.PRECIP_ERROR.std()
+
+    mu_y = joint_df.MAX_TEMP_ERROR.mean()
+    sigma_y = joint_df.MAX_TEMP_ERROR.std()
+    
+    if p_val < 0.01:
+        json_dict['SIGMA'] = [[sigma_x**2, rho*sigma_x*sigma_y], [rho*sigma_x*sigma_y, sigma_y**2]]
+    
+    else:
+        print(f'MAX_TEMP and PRECIP errors are independent for {os.path.basename(png_outpath)[:-4]}')
+        json_dict['SIGMA'] = [sigma_x, sigma_y]
+
+    json_dict['MU'] = [mu_x, mu_y]
+    json_dict['RHO'] = rho
+
+    write_json(json_dict, bivar_json_path, new_json)    
+
+    if not os.path.exists(png_outpath):
+        if not os.path.exists(os.path.dirname(png_outpath)):
+            os.makedirs(os.path.dirname(png_outpath), exist_ok=True)
+        
+        # plot and save with R on graph
+        # fig, ax1 = plt.subplots(figsize=(12, 8))
+        fig = sns.jointplot(x=joint_df.PRECIP_ERROR, y=joint_df.MAX_TEMP_ERROR)
+        plt.text(joint_df.PRECIP_ERROR.min(), joint_df.MAX_TEMP_ERROR.min(), \
+            f"R: {round(rho,4)}\np-val: {round(p_val,4)}",\
+            horizontalalignment='left', size='medium', color='black', weight='semibold')
+        plt.suptitle(f'{os.path.basename(png_outpath)[:-4]}\n', fontsize=14)
+        plt.savefig(png_outpath, bbox_inches='tight', facecolor='white')
+        plt.close()
+
+    return
+
 ### MAIN ###
 # 1) make all CSVs OBS and PROJ
 # 2) calculate diff between obs and proj and save to csv
 #    - raw diff, mean percent error, median percent error
 #    - try to figure out which is best to use for MC bootstrapping
 # 3) plot error dist for each szn, huc4, variable
-# 4) check for temporal trend in error
-# 5) fit distributions...
+# 4) 
+# 5) check for temporal trend in error
+# 6) fit distributions...
 
 def main():
-    src_lst = ['GRIDMET', 'GFDL']#, 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
+    src_lst = ['GRIDMET', 'GFDL', 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
     obs_proj_dict = {'OBS': [['Sp', 'Su', 'Fa', 'Wi'], ['Pr', 'maxTemp', 'minTemp']],\
                      'PROJ': [['SPRING', 'SUMMER', 'FALL', 'WINTER'], ['PRECIP', 'MAX_TEMP', 'MIN_TEMP']]}
 
@@ -210,3 +285,30 @@ def main():
 
             outpath = f'../imgs/Paper2/error_dist/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_dist.png'    
             save_error_png(outpath, huc4_diff_path, dist=True)
+    ###############################################
+
+    ###############################################
+    #### make bivariate plots and save bivaraite variables ####
+    ###############################################
+    for huc4 in huc4_lst:
+        huc4_precip_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/PRECIP/*/*{huc4}*.csv')
+        huc4_precip_lst.sort()
+        huc4_mxTemp_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/MAX_TEMP/*/*{huc4}*.csv')    
+        huc4_mxTemp_lst.sort()
+
+        for i in range(len(huc4_precip_lst)):
+            info_lst = huc4_mxTemp_lst[i].split('\\')
+            src = info_lst[1]
+            szn = info_lst[2]
+            scn = info_lst[4]
+
+            png_outpath = f'../imgs/Paper2/error_bivar_dist/{src}/{szn}/PRECIP_MAXT/{scn}/{src}_{szn}_PRECIP_MAXT_BIVAR_{scn}_{huc4}_error_dist.png'
+            
+            calc_error_correlation(precip_path=huc4_precip_lst[i],
+                                   mxTemp_path=huc4_mxTemp_lst[i],
+                                   png_outpath=png_outpath,
+                                   src=src, szn=szn, scn=scn, huc4=huc4)
+    
+
+if __name__ == '__main__':
+    main()
