@@ -294,7 +294,7 @@ def calc_trivar_error_correlation(agri_path=str, ints_path=str, frst_path=str, s
         json_dict['SIGMA_AGRI'] = sigma_x
     
     else:
-        print(f'MAX_TEMP and AGRI errors are independent for {os.path.basename(png_outpath)[:-4]}')
+        print(f'All LCLU errors are independent for {os.path.basename(agri_path)[:-4]}')
         json_dict['SIGMA'] = [sigma_x, sigma_y]
 
     json_dict['MU'] = [mu_x, mu_y, mu_z]
