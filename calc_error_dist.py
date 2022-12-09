@@ -99,31 +99,37 @@ def mk_year_season_csv(outpath = str):
     return()
 
 
-def mk_diff_csv(gridmet_path=str, src_path=str, src=str, szn=str, var=str, scn=str):
+def mk_diff_csv(obs_path=str, src_path=str, src=str, szn=str, var=str, scn=str):
 
-    gridmet_df = pd.read_csv(gridmet_path, index_col=0)
-    gridmet_df.loc[:, 'huc4'] = [str(i)[0:4] for i in gridmet_df['huc8'].to_list()]
+    var_group = obs_path.split('/')[2]
+
+    obs_df = pd.read_csv(obs_path, index_col=0)
+    obs_df.loc[:, 'huc4'] = [str(i)[0:4] for i in obs_df['huc8'].to_list()]
     src_df = pd.read_csv(src_path, index_col=0)
     src_df.loc[:, 'huc4'] = [str(i)[0:4] for i in src_df['huc8'].to_list()]
-    huc4_lst = gridmet_df.huc4.unique()
+    huc4_lst = obs_df.huc4.unique()
     
-    outpath_lst = [f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}.csv'\
-        for huc4 in huc4_lst]
-    
+    if var_group == 'CliamteData':
+        outpath_lst = [f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}.csv'\
+            for huc4 in huc4_lst]
+    elif var_group == 'LandCover':
+        outpath_lst = [f'../data/LandCover/FORESCE_NLCDCDL_diff_CSVs/{scn}/{var}/{src}_{var}_DIFF_{scn}_{huc4}.csv'\
+            for huc4 in huc4_lst]
+
     for outpath in outpath_lst:
         if not os.path.exists(outpath):
             if not os.path.exists(os.path.dirname(outpath)):
                 os.makedirs(os.path.dirname(outpath), exist_ok=True)
 
             huc4 = outpath[:-4].split('_')[-1]  # get huc4 name
-            gridmet_huc_df = gridmet_df[gridmet_df['huc4']==huc4]   # get gridmet data for huc4
-            gridmet_huc_df = gridmet_huc_df.set_index('huc8')
+            obs_huc_df = obs_df[obs_df['huc4']==huc4]   # get obs data for huc4
+            obs_huc_df = obs_huc_df.set_index('huc8')
             src_huc_df = src_df[src_df['huc4']==huc4]   # get src data for huc4
             src_huc_df = src_huc_df.set_index('huc8')
-            yr_lst = [i for i in gridmet_huc_df.columns if i in src_huc_df.columns] # get years that both gridmet and src have
+            yr_lst = [i for i in obs_huc_df.columns if i in src_huc_df.columns] # get years that both obs and src have
             yr_lst.sort()
             yr_lst = yr_lst[:-1]
-            diff_df = src_huc_df[yr_lst] - gridmet_huc_df[yr_lst]
+            diff_df = src_huc_df[yr_lst] - obs_huc_df[yr_lst]
             diff_df.to_csv(outpath)
             print(f'{os.path.basename(outpath)} saved.')
 
@@ -279,23 +285,36 @@ def main():
     ###############################################
     #### make diff csvs ####
     ###############################################
-    gridmet_lst = glob('../data/ClimateData/macav2livneh_GRIDMET_CSVs/GRIDMET/*.csv')
-    gridmet_info_dict = {'Sp':'SPRING', 'Su':'SUMMER', 'Fa':'FALL', 'Wi':'WINTER',\
-        'Pr':'PRECIP', 'maxTemp':'MAX_TEMP', 'minTemp':'MIN_TEMP'}
-    scn_lst = ['HISTORICAL', 'RCP45', 'RCP85']
+    var_group_lst = ['Climate', 'LandCover']
+    for var_group in var_group_lst:
+        if var_group == 'Cliamte':
+            obs_lst = glob('../data/ClimateData/macav2livneh_GRIDMET_CSVs/GRIDMET/*.csv')
+            obs_info_lst = {'Sp':'SPRING', 'Su':'SUMMER', 'Fa':'FALL', 'Wi':'WINTER',\
+                'Pr':'PRECIP', 'maxTemp':'MAX_TEMP', 'minTemp':'MIN_TEMP'}
+            scn_lst = ['HISTORICAL', 'RCP45', 'RCP85']
+        elif var_group == 'LandCover':
+            obs_lst = glob('../data/LandCover/FORESCE_NLCDCDL_CSVs/NLCDCDL/*.csv')
+            scn_lst = ['A1B', 'A2', 'B1', 'B2']
 
-    for gridmet_path in gridmet_lst:
-        info_lst = os.path.basename(gridmet_path)[:-4].split('_')
-        szn = gridmet_info_dict[info_lst[1]]
-        var = gridmet_info_dict[info_lst[2]]
+        for obs_path in obs_lst:
+            info_lst = os.path.basename(obs_path)[:-4].split('_')
+            if var_group == 'Climate':
+                szn = obs_info_lst[info_lst[1]]
+                var = obs_info_lst[info_lst[2]]
 
-        for scn in scn_lst:
-            for src in src_lst:
-                if src == 'GRIDMET':
-                    continue
+                for scn in scn_lst:
+                    for src in src_lst:
+                        if src == 'GRIDMET':
+                            continue
 
-                src_path = glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{src}/*{szn}_{var}*{scn}*.csv')[0]
-                mk_diff_csv(gridmet_path, src_path, src, szn, var, scn)
+                        src_path = glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{src}/*{szn}_{var}*{scn}*.csv')[0]
+                        mk_diff_csv(obs_path, src_path, src, szn, var, scn)
+            elif var_group == 'LandCover':
+                var = info_lst[1]
+                for scn in scn_lst:
+                    src_path = glob(f'../data/LandCover/FORESCE_NLCDCDL_CSVs/{scn}/*{var}*{scn}*.csv')[0]
+                    mk_diff_csv(obs_path, src_path, src='FORESCE', var=var, scn=scn)
+
     print('All DIFF csv have been saved.')
     ###############################################
 
