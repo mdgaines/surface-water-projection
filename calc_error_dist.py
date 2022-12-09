@@ -325,23 +325,36 @@ def main():
                 '3110', '3130', '3060', '3070', '3120', '8090', '8080', '8070',
                 '8050', '8060', '3180', '8030', '3170', '3040', '3030', '3020',
                 '3010', '3050', '6010', '6020', '8010', '6040', '6030']
-    for huc4 in huc4_lst:
-        huc4_diff_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/*/*/*{huc4}*.csv')
-        for huc4_diff_path in huc4_diff_lst:
-            info_lst = os.path.basename(huc4_diff_path)[:-4].split('_')
-            src = info_lst[0] # data source (GFDL, etc.)
-            szn = info_lst[1] # season (SPRING, SUMMER, FALL, WINTER for GCMs)
-            if 'TEMP' in huc4_diff_path:
-                var = '_'.join([info_lst[2], info_lst[3]])
+    for var_group in var_group_lst:
+        for huc4 in huc4_lst:
+            if var_group == 'Climate':
+                huc4_diff_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/*/*/*{huc4}*.csv')
             else:
-                var = info_lst[2] # variable (PRECIP, MAX_TEMP, MIN_TEMP for GCMs)
-            scn = info_lst[-2] # scenario (HISTORICAL, RCP45, RCP85 for GCMs)
-            
-            outpath = f'../imgs/Paper2/error_temporal/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_temporal.png'    
-            save_error_png(outpath, huc4_diff_path, dist=False)
+                huc4_diff_lst = glob(f'../data/LandCover/FORESCE_NLCDCDL_diff_CSVs/*/*/*{huc4}*.csv')
+            for huc4_diff_path in huc4_diff_lst:
+                info_lst = os.path.basename(huc4_diff_path)[:-4].split('_')
+                src = info_lst[0] # data source (GFDL, etc.)
+                scn = info_lst[-2] # scenario (HISTORICAL, RCP45, RCP85 for GCMs)
+                if var_group == 'Climate':
+                    szn = info_lst[1] # season (SPRING, SUMMER, FALL, WINTER for GCMs)
+                    if 'TEMP' in huc4_diff_path:
+                        var = '_'.join([info_lst[2], info_lst[3]])
+                    else:
+                        var = info_lst[2] # variable (PRECIP, MAX_TEMP, MIN_TEMP for GCMs)
+                    
+                    outpath = f'../imgs/Paper2/error_temporal/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_temporal.png'    
+                    save_error_png(outpath, huc4_diff_path, dist=False)
 
-            outpath = f'../imgs/Paper2/error_dist/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_dist.png'    
-            save_error_png(outpath, huc4_diff_path, dist=True)
+                    outpath = f'../imgs/Paper2/error_dist/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}_error_dist.png'    
+                    save_error_png(outpath, huc4_diff_path, dist=True)
+                else:
+                    var = info_lst[1]
+                    outpath =  f'../imgs/Paper2/error_temporal/{src}/{scn}/{var}/{src}_{var}_DIFF_{scn}_{huc4}_error_temporal.png'
+                    save_error_png(outpath, huc4_diff_path, dist=False)
+
+                    outpath =  f'../imgs/Paper2/error_dist/{src}/{scn}/{var}/{src}_{var}_DIFF_{scn}_{huc4}_error_dist.png'
+                    save_error_png(outpath, huc4_diff_path, dist=True)
+
     print('All DIFF PNGs have been saved.')
     ###############################################
 
