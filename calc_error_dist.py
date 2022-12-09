@@ -109,7 +109,7 @@ def mk_diff_csv(obs_path=str, src_path=str, src=str, szn=str, var=str, scn=str):
     src_df.loc[:, 'huc4'] = [str(i)[0:4] for i in src_df['huc8'].to_list()]
     huc4_lst = obs_df.huc4.unique()
     
-    if var_group == 'CliamteData':
+    if var_group == 'ClimateData':
         outpath_lst = [f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/{src}/{szn}/{var}/{scn}/{src}_{szn}_{var}_DIFF_{scn}_{huc4}.csv'\
             for huc4 in huc4_lst]
     elif var_group == 'LandCover':
@@ -229,6 +229,82 @@ def calc_error_correlation(precip_path=str, mxTemp_path=str, png_outpath=str, \
 
     return
 
+def calc_trivar_error_correlation(agri_path=str, ints_path=str, frst_path=str, src=str, scn=str, huc4=str):
+
+    trivar_json_path = f'../data/LandCover/FORESCE_NLCDCDL_trivar_JSONs/{src}_PREICP_MAXT_trivar_{scn}.json'
+    new_json= False
+    if not os.path.exists(trivar_json_path):
+        if not os.path.exists(os.path.dirname(trivar_json_path)):
+            os.makedirs(os.path.dirname(trivar_json_path), exist_ok=True)
+        new_json = True
+
+    agri = pd.read_csv(agri_path)
+    new_agri_df = pd.DataFrame()
+    agri = agri.set_index('huc8')
+    new_agri_df['HUC_YR'] = ['_'.join([str(i), yr]) for i in agri.index for yr in agri.columns]
+    new_agri_df['AGRI_ERROR'] = agri.stack().values
+
+    ints = pd.read_csv(ints_path)
+    new_ints_df = pd.DataFrame()
+    ints = ints.set_index('huc8')
+    new_ints_df['HUC_YR'] = ['_'.join([str(i), yr]) for i in ints.index for yr in ints.columns]
+    new_ints_df['INTS_ERROR'] = ints.stack().values
+
+    frst = pd.read_csv(frst_path)
+    new_frst_df = pd.DataFrame()
+    frst = frst.set_index('huc8')
+    new_frst_df['HUC_YR'] = ['_'.join([str(i), yr]) for i in frst.index for yr in frst.columns]
+    new_frst_df['FRST_ERROR'] = frst.stack().values
+
+    joint_df = new_agri_df.merge(new_ints_df, on='HUC_YR')
+    joint_df = joint_df.merge(new_frst_df, on='HUC_YR')
+
+    rho_xy, p_val_xy = pearsonr(joint_df.AGRI_ERROR, joint_df.INTS_ERROR)
+    rho_xz, p_val_xz = pearsonr(joint_df.AGRI_ERROR, joint_df.FRST_ERROR)
+    rho_yz, p_val_yz = pearsonr(joint_df.INTS_ERROR, joint_df.FRST_ERROR)
+
+    p_val_lst = [p_val_xy, p_val_xz, p_val_yz]
+
+    json_dict = {'HUC04':huc4}
+
+    mu_x = joint_df.AGRI_ERROR.mean()
+    sigma_x = joint_df.AGRI_ERROR.std()
+
+    mu_y = joint_df.INTS_ERROR.mean()
+    sigma_y = joint_df.INTS_ERROR.std()
+
+    mu_z = joint_df.FRST_ERROR.mean()
+    sigma_z = joint_df.FRST_ERROR.std()
+    
+    if len([i for i in p_val_lst if i < 0.01]) >= 2:
+        json_dict['SIGMA_ALL'] = [[sigma_x**2, rho_xy*sigma_x*sigma_y, rho_xz*sigma_x*sigma_z], 
+                              [rho_xy*sigma_x*sigma_y, sigma_y**2, rho_yz*sigma_y*sigma_z],
+                              [rho_xz*sigma_x*sigma_z, rho_yz*sigma_y*sigma_z, sigma_z**2]]
+    elif p_val_xy < 0.01:
+        json_dict['SIGMA_AGRI_INTS'] = [[sigma_x**2, rho_xy*sigma_x*sigma_y],
+                                        [rho_xy*sigma_x*sigma_y, sigma_y**2]]
+        json_dict['SIGMA_FRST'] = sigma_z
+    elif p_val_xz < 0.01:
+        json_dict['SIGMA_AGRI_FRST'] = [[sigma_x**2, rho_xz*sigma_x*sigma_z],
+                                        [rho_xz*sigma_x*sigma_z, sigma_z**2]]
+        json_dict['SIGMA_INTS'] = sigma_y
+    elif p_val_yz < 0.01:
+        json_dict['SIGMA_INTS_FRST'] = [[sigma_y**2, rho_yz*sigma_y*sigma_z],
+                                        [rho_yz*sigma_y*sigma_z, sigma_z**2]]
+        json_dict['SIGMA_AGRI'] = sigma_x
+    
+    else:
+        print(f'MAX_TEMP and AGRI errors are independent for {os.path.basename(png_outpath)[:-4]}')
+        json_dict['SIGMA'] = [sigma_x, sigma_y]
+
+    json_dict['MU'] = [mu_x, mu_y, mu_z]
+    json_dict['RHO'] = [rho_xy, rho_xz, rho_yz]
+    json_dict['P_VALS'] = p_val_lst
+
+    write_json(json_dict, trivar_json_path, new_json)    
+
+    return
+
 ### MAIN ###
 # 1) make all CSVs OBS and PROJ
 # 2) calculate diff between obs and proj and save to csv
@@ -287,11 +363,13 @@ def main():
     ###############################################
     var_group_lst = ['Climate', 'LandCover']
     for var_group in var_group_lst:
-        if var_group == 'Cliamte':
+        if var_group == 'Climate':
             obs_lst = glob('../data/ClimateData/macav2livneh_GRIDMET_CSVs/GRIDMET/*.csv')
             obs_info_lst = {'Sp':'SPRING', 'Su':'SUMMER', 'Fa':'FALL', 'Wi':'WINTER',\
                 'Pr':'PRECIP', 'maxTemp':'MAX_TEMP', 'minTemp':'MIN_TEMP'}
             scn_lst = ['HISTORICAL', 'RCP45', 'RCP85']
+            src_lst = ['GRIDMET', 'GFDL', 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
+
         elif var_group == 'LandCover':
             obs_lst = glob('../data/LandCover/FORESCE_NLCDCDL_CSVs/NLCDCDL/*.csv')
             scn_lst = ['A1B', 'A2', 'B1', 'B2']
@@ -361,24 +439,45 @@ def main():
     ###############################################
     #### make bivariate plots and save bivaraite variables ####
     ###############################################
-    for huc4 in huc4_lst:
-        huc4_precip_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/PRECIP/*/*{huc4}*.csv')
-        huc4_precip_lst.sort()
-        huc4_mxTemp_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/MAX_TEMP/*/*{huc4}*.csv')    
-        huc4_mxTemp_lst.sort()
+    for var_group in var_group_lst:
+        for huc4 in huc4_lst:
+            if var_group == 'Climate':
+                huc4_precip_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/PRECIP/*/*{huc4}*.csv')
+                huc4_precip_lst.sort()
+                huc4_mxTemp_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_diff_CSVs/*/*/MAX_TEMP/*/*{huc4}*.csv')    
+                huc4_mxTemp_lst.sort()
 
-        for i in range(len(huc4_precip_lst)):
-            info_lst = huc4_mxTemp_lst[i].split('\\')
-            src = info_lst[1]
-            szn = info_lst[2]
-            scn = info_lst[4]
+                for i in range(len(huc4_precip_lst)):
+                    info_lst = huc4_mxTemp_lst[i].split('\\')
+                    src = info_lst[1]
+                    szn = info_lst[2]
+                    scn = info_lst[4]
 
-            png_outpath = f'../imgs/Paper2/error_bivar_dist/{src}/{szn}/PRECIP_MAXT/{scn}/{src}_{szn}_PRECIP_MAXT_BIVAR_{scn}_{huc4}_error_dist.png'
-            
-            calc_error_correlation(precip_path=huc4_precip_lst[i],
-                                   mxTemp_path=huc4_mxTemp_lst[i],
-                                   png_outpath=png_outpath,
-                                   src=src, szn=szn, scn=scn, huc4=huc4)
+                    png_outpath = f'../imgs/Paper2/error_bivar_dist/{src}/{szn}/PRECIP_MAXT/{scn}/{src}_{szn}_PRECIP_MAXT_BIVAR_{scn}_{huc4}_error_dist.png'
+                    
+                    calc_error_correlation(precip_path=huc4_precip_lst[i],
+                                        mxTemp_path=huc4_mxTemp_lst[i],
+                                        png_outpath=png_outpath,
+                                        src=src, szn=szn, scn=scn, huc4=huc4)
+            else:
+                huc4_agri_lst = glob(f'../data/LandCover/FORESCE_NLCDCDL_diff_CSVs/*/AGRI/*{huc4}*.csv')
+                huc4_agri_lst.sort()
+                huc4_ints_lst = glob(f'../data/LandCover/FORESCE_NLCDCDL_diff_CSVs/*/INTS/*{huc4}*.csv')
+                huc4_ints_lst.sort()
+                huc4_frst_lst = glob(f'../data/LandCover/FORESCE_NLCDCDL_diff_CSVs/*/FRST/*{huc4}*.csv')
+                huc4_frst_lst.sort()
+
+                for i in range(len(huc4_agri_lst)):
+                    info_lst = huc4_agri_lst[i].split('\\')
+                    scn = info_lst[1]
+
+                    png_outpath = f'../imgs/Paper2/error_multivar_dist/{src}/{scn}/AGRI_INTS_FRST/{src}_AGRI_INTS_FRST_MULTIIVAR_{scn}_{huc4}_error_dist.png'
+
+                    calc_trivar_error_correlation(agri_path=huc4_agri_lst[i],
+                                        ints_path=huc4_ints_lst[i],
+                                        frst_path=huc4_frst_lst[i],
+                                        src=src, scn=scn, huc4=huc4)
+
     print('All BIVAR JSONs and PNGs have been saved.')
     ###############################################
 
