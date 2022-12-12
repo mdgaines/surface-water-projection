@@ -138,3 +138,33 @@ for i in range(len(rcp_sznAvg_path_lst)):
     print(os.path.basename(outpath), 'saved.')
 
     del(new_df)
+
+
+
+############################################
+############ AGU 2022 ####################
+##########################################
+
+# Get CSVs of mean and stdev of GRIDMET climate vars from 2000-2018
+szn_dict = {'Sp':'SPRING', 'Su':'SUMMER', 'Fa':'FALL', 'Wi':'WINTER'}
+var_dict = {'Pr': 'PRECIP', 'maxTemp':'MAX_TEMP'}
+
+for szn in ['Sp', 'Su', 'Fa', 'Wi']:
+    for var in ['Pr', 'maxTemp']:
+
+        outpath = f'../data/ClimateData/GRIDMET_AVG_STDEV/2000_2018_{szn_dict[szn]}_{var_dict[var]}_AVG_STDV.csv'
+
+        if not os.path.exists(outpath):
+            
+            cVar_lst = glob(f'../data/ClimateData/GRIDMET_AVG_STDEV/GRIDMET_YR_AVG/*{szn}_{var}*.csv')
+            cVar_lst.sort()
+            cVar_lst = cVar_lst[21:40]
+            for i in range(len(cVar_lst)):
+                cVar_df = pd.read_csv(cVar_lst[i], usecols=['huc8', 'mean'])
+                if i == 0:
+                    df = cVar_df
+                else:
+                    df = df.join(cVar_df.set_index('huc8'), on='huc8', lsuffix=cVar_lst[i].split('\\')[-1][:4])
+
+            out_df = pd.DataFrame({'huc8':df.set_index('huc8').T.mean().index,'mean':df.set_index('huc8').T.mean().values, 'std':df.set_index('huc8').T.std().values})
+            out_df.to_csv(outpath)

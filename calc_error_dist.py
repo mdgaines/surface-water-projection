@@ -295,7 +295,7 @@ def calc_trivar_error_correlation(agri_path=str, ints_path=str, frst_path=str, s
     
     else:
         print(f'All LCLU errors are independent for {os.path.basename(agri_path)[:-4]}')
-        json_dict['SIGMA'] = [sigma_x, sigma_y]
+        json_dict['SIGMA'] = [sigma_x, sigma_y, sigma_z]
 
     json_dict['MU'] = [mu_x, mu_y, mu_z]
     json_dict['RHO'] = [rho_xy, rho_xz, rho_yz]
