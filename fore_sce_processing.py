@@ -159,4 +159,4 @@ for i in range(len(tif_paths)):
         del(huc8_df)    
     
     else:
-        print('{yr}_{sres}_lclu.csv exists.'.format(yr, sres))
+        print(f'{yr}_{sres}_lclu.csv exists.')

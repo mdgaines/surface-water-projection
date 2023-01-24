@@ -331,7 +331,7 @@ def main():
             scn_lst = ['OBS']
         elif src == 'FORESCE':
             tag = 'PROJ'
-            scn_lst = ['A1B', 'A2', 'B1', 'B2']
+            scn_lst = ['A1B', 'A2', 'B1', 'B2', 'Historical']
         else:
             tag = 'PROJ'
             scn_lst = ['HISTORICAL_PROJ', 'RCP45_PROJ', 'RCP85_PROJ']
@@ -372,7 +372,7 @@ def main():
 
         elif var_group == 'LandCover':
             obs_lst = glob('../data/LandCover/FORESCE_NLCDCDL_CSVs/NLCDCDL/*.csv')
-            scn_lst = ['A1B', 'A2', 'B1', 'B2']
+            scn_lst = ['A1B', 'A2', 'B1', 'B2', 'Historical']
 
         for obs_path in obs_lst:
             info_lst = os.path.basename(obs_path)[:-4].split('_')
