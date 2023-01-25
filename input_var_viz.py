@@ -8,6 +8,7 @@ import seaborn as sns
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator, IndexLocator)
+import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -35,39 +36,7 @@ def clean_df(df): #, huc=False, add_rand=False):
 
 
 # import data
-
-scn_lst = ['Historical', 'A1B', 'A2', 'B1', 'B2']
-lclu_lst = ['FRST', 'INTS', 'AGRI']
-
-scn_dict = {'Historical': (5, (10, 3)), 
-                   'A1B': (0, (5, 5)), 
-                    'A2': (0, (5, 1)), 
-                    'B1': 'dashdot', 
-                    'B2': (0, (3, 1, 1, 1, 1, 1))}
-lclu_dict = {'FRST': ['green', 'Forest-dominated'], 
-             'INTS': ['red', 'Intensive'], 
-             'AGRI': ['brown', 'Agriculture']}
-
-fig, ax1 = plt.subplots(figsize=(16, 8))
-
-for scn in scn_lst:
-    for lclu in lclu_lst:
-        fl = glob(f'../data/LandCover/FORESCE_NLCDCDL_CSVs/{scn}/*{lclu}*.csv')[0]
-        df = pd.read_csv(fl, index_col=0)
-        df = df.set_index('huc8')
-        df_avg = df.mean() * 100
-
-        if scn == 'Observed':
-            ax1.plot(df, color=lclu_dict[lclu][0], linestyle=scn_dict[scn], 
-                        label=lclu_dict[lclu][1], linewidth=2)
-        elif lclu == 'FRST':
-            ax1.plot(df, color=lclu_dict[lclu][0], linestyle=scn_dict[scn], 
-                        label=scn, linewidth=2)
-        else:
-            ax1.plot(df, color=lclu_dict[lclu][0], linestyle=scn_dict[scn], 
-                        linewidth=2)
-
-
+###### Historical ######
 hist_frst_df = pd.read_csv(glob('../data/LandCover/FORESCE_NLCDCDL_CSVs/Historical/*FRST*.csv')[0], index_col=0)
 hist_frst_df = hist_frst_df.set_index('huc8')
 hist_frst_avg = hist_frst_df.mean() * 100
@@ -193,21 +162,34 @@ ax1.yaxis.set_major_formatter('{x:.0f}')
 ax1.yaxis.set_minor_locator(MultipleLocator(5))
 ax1.yaxis.grid(True, which='major', linestyle = (0, (1, 5)))
 
-# ax1.set_xticks([1991, 2101])
-
 ax1.xaxis.set_major_locator(IndexLocator(base=10, offset=-2))
 # ax1.xaxis.set_major_formatter('{x:.0f}')
 # For the minor ticks, use no labels; default NullFormatter.
 ax1.xaxis.set_minor_locator(MultipleLocator(1))
-
 ax1.xaxis.grid(True, which='major', linestyle = (0, (1, 5)))
 
 # reordering the labels
 handles, labels = plt.gca().get_legend_handles_labels()
+
+hist = mlines.Line2D([], [], color='black', linewidth=3, ls=(5, (10, 3)), label='Historical')
+a1b = mlines.Line2D([], [], color='black', linewidth=3, ls=(0,(5,5)), label='A1B')
+a2 = mlines.Line2D([], [], color='black', linewidth=3, ls=(0,(5,1)), label='A2')
+b1 = mlines.Line2D([], [], color='black', linewidth=3, ls='dashdot', label='B1')
+b2 = mlines.Line2D([], [], color='black', linewidth=3, ls=(0, (3, 1,1,1,1,1)), label='B2')
+handles[0] = hist
+handles[1] = a1b
+handles[2] = a2
+handles[3] = b1
+handles[4] = b2
+
 # specify order
 order = [5, 6, 7, 0, 1, 2, 3, 4]
 # pass handle & labels lists along with order as below
 ax1.legend([handles[i] for i in order], [labels[i] for i in order])
+
+fig.savefig('../imgs/Paper2/var_projections/FORE-SCE.png', dpi=300,\
+    facecolor='w', edgecolor='w', transparent=False, pad_inches=0)
+
 
 # adjust y axis to go from 0 to 100 and have more ticks
 # different dash marks for different projections
