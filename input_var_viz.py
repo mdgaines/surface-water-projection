@@ -207,42 +207,85 @@ def save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
         facecolor='w', edgecolor='w', transparent=False, pad_inches=0)
 
 
-gfdl_mxtemp_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/GFDL/*MAX_TEMP*RCP45*.csv')
+def import_gcm_data(gcm=str, scn=str, var=str, WRR=False):
 
-gfdl_mxtemp_spri = pd.read_csv(gfdl_mxtemp_lst[0], index_col=0)
-gfdl_mxtemp_spri = gfdl_mxtemp_spri.set_index('huc8')
-gfdl_mxtemp_spri.columns = gfdl_mxtemp_spri.columns + '00'
+    if gcm == 'GRIDMET':
+        gcm_spri = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*Sp*{var}*.csv')[0], index_col=0)
+        gcm_summ = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*Su*{var}*.csv')[0], index_col=0)
+        gcm_fall = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*Fa*{var}*.csv')[0], index_col=0)
+        gcm_wint = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*Wi*{var}*.csv')[0], index_col=0)
 
-gfdl_mxtemp_summ = pd.read_csv(gfdl_mxtemp_lst[1], index_col=0)
-gfdl_mxtemp_summ = gfdl_mxtemp_summ.set_index('huc8')
-gfdl_mxtemp_summ.columns = gfdl_mxtemp_summ.columns + '25'
+    else:
+        gcm_spri = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*SPRING*{var}*{scn}*.csv')[0], index_col=0)
+        gcm_summ = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*SUMMER*{var}*{scn}*.csv')[0], index_col=0)
+        gcm_fall = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*FALL*{var}*{scn}*.csv')[0], index_col=0)
+        gcm_wint = pd.read_csv(glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/{gcm}/*WINTER*{var}*{scn}*.csv')[0], index_col=0)
 
-gfdl_mxtemp_fall = pd.read_csv(gfdl_mxtemp_lst[2], index_col=0)
-gfdl_mxtemp_fall = gfdl_mxtemp_fall.set_index('huc8')
-gfdl_mxtemp_fall.columns = gfdl_mxtemp_fall.columns + '50'
+    gcm_spri = gcm_spri.set_index('huc8')
+    gcm_spri.columns = gcm_spri.columns + '00'
 
-gfdl_mxtemp_wint = pd.read_csv(gfdl_mxtemp_lst[3], index_col=0)
-gfdl_mxtemp_wint = gfdl_mxtemp_wint.set_index('huc8')
-gfdl_mxtemp_wint.columns = gfdl_mxtemp_wint.columns + '75'
+    gcm_summ = gcm_summ.set_index('huc8')
+    gcm_summ.columns = gcm_summ.columns + '25'
 
-gfdl_mxtemp_all = gfdl_mxtemp_spri.merge(gfdl_mxtemp_summ, on='huc8')
-gfdl_mxtemp_all = gfdl_mxtemp_all.merge(gfdl_mxtemp_fall, on='huc8')
-gfdl_mxtemp_all = gfdl_mxtemp_all.merge(gfdl_mxtemp_wint, on='huc8')
+    gcm_fall = gcm_fall.set_index('huc8')
+    gcm_fall.columns = gcm_fall.columns + '50'
 
-gfdl_mxtemp_avg = gfdl_mxtemp_all.sort_index(axis = 1).mean()
+    gcm_wint = gcm_wint.set_index('huc8')
+    gcm_wint.columns = gcm_wint.columns + '75'
+
+    gcm_all = gcm_spri.merge(gcm_summ, on='huc8')
+    gcm_all = gcm_all.merge(gcm_fall, on='huc8')
+    gcm_all = gcm_all.merge(gcm_wint, on='huc8')
+
+    gcm_avg = gcm_all.sort_index(axis = 1).mean()
+
+    return(gcm_avg)
 
 
-fig, ax1 = plt.subplots(figsize=(16, 8))
+# rcp 45
+GRIDMET_mxtemp_45 = import_gcm_data('GRIDMET', 'RCP45', 'maxTemp')
 
-ax1.plot(gfdl_mxtemp_avg)
+GFDL_mxtemp_45 = import_gcm_data('GFDL', 'RCP45', 'MAX_TEMP')
+HadGEM2_mxtemp_45 = import_gcm_data('HadGEM2', 'RCP45', 'MAX_TEMP')
+IPSL_mxtemp_45 = import_gcm_data('IPSL', 'RCP45', 'MAX_TEMP')
+MIROC5_mxtemp_45 = import_gcm_data('MIROC5', 'RCP45', 'MAX_TEMP')
+NorESM1_mxtemp_45 = import_gcm_data('NorESM1', 'RCP45', 'MAX_TEMP')
 
-ax1.yaxis.set_major_locator(MultipleLocator(10))
+GFDL_mxtemp_85 = import_gcm_data('GFDL', 'RCP85', 'MAX_TEMP')
+HadGEM2_mxtemp_85 = import_gcm_data('HadGEM2', 'RCP85', 'MAX_TEMP')
+IPSL_mxtemp_85 = import_gcm_data('IPSL', 'RCP85', 'MAX_TEMP')
+MIROC5_mxtemp_85 = import_gcm_data('MIROC5', 'RCP85', 'MAX_TEMP')
+NorESM1_mxtemp_85 = import_gcm_data('NorESM1', 'RCP85', 'MAX_TEMP')
+
+
+fig, ax1 = plt.subplots(figsize=(24, 8))
+
+ax1.plot(GRIDMET_mxtemp_45[53:], color='black')
+
+# ax1.plot(GFDL_mxtemp_45, alpha=0.75, color='dodgerblue', linestyle='dotted')
+# ax1.plot(HadGEM2_mxtemp_45, alpha=0.75, color='dodgerblue', linestyle='dashed')
+# ax1.plot(IPSL_mxtemp_45, alpha=0.75, color='dodgerblue', linestyle='dashdot')
+# ax1.plot(NorESM1_mxtemp_45, alpha=0.75, color='dodgerblue', linestyle=(0,(5,10)))
+
+# ax1.plot(GFDL_mxtemp_85, alpha=0.75, color='pink', linestyle='dotted')
+# ax1.plot(HadGEM2_mxtemp_85, alpha=0.75, color='pink', linestyle='dashed')
+# ax1.plot(IPSL_mxtemp_85, alpha=0.75, color='pink', linestyle='dashdot')
+# ax1.plot(NorESM1_mxtemp_85, alpha=0.75, color='pink', linestyle=(0,(5,10)))
+
+ax1.plot((GFDL_mxtemp_45 + HadGEM2_mxtemp_45 + IPSL_mxtemp_45 + NorESM1_mxtemp_45)/4,
+        color='dodgerblue', alpha=0.5)
+
+ax1.plot((GFDL_mxtemp_85 + HadGEM2_mxtemp_85 + IPSL_mxtemp_85 + NorESM1_mxtemp_85)/4,
+        color='red', alpha=0.5)
+
+
+ax1.yaxis.set_major_locator(MultipleLocator(5))
 ax1.yaxis.set_major_formatter('{x:.0f}')
 # For the minor ticks, use no labels; default NullFormatter.
-ax1.yaxis.set_minor_locator(MultipleLocator(5))
+ax1.yaxis.set_minor_locator(MultipleLocator(1))
 ax1.yaxis.grid(True, which='major', linestyle = (0, (1, 5)))
 
-ax1.xaxis.set_major_locator(IndexLocator(base=40, offset=16))
+ax1.xaxis.set_major_locator(IndexLocator(base=40, offset=-8))
 # ax1.xaxis.set_major_formatter('{x:.0f}')
 # For the minor ticks, use no labels; default NullFormatter.
 ax1.xaxis.set_minor_locator(IndexLocator(base=4, offset=-24))
@@ -277,3 +320,28 @@ save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
 # assess Mann-Kendall across full study area avgs and WRRs (can do by HUC 4 or 8 later if needed)
 
 # fig.savefig(outpath, bbox_inches='tight', facecolor='white')
+
+
+# gfdl_mxtemp_lst = glob(f'../data/ClimateData/macav2livneh_GRIDMET_CSVs/GFDL/*MAX_TEMP*RCP45*.csv')
+
+# gfdl_mxtemp_spri = pd.read_csv(gfdl_mxtemp_lst[0], index_col=0)
+# gfdl_mxtemp_spri = gfdl_mxtemp_spri.set_index('huc8')
+# gfdl_mxtemp_spri.columns = gfdl_mxtemp_spri.columns + '00'
+
+# gfdl_mxtemp_summ = pd.read_csv(gfdl_mxtemp_lst[1], index_col=0)
+# gfdl_mxtemp_summ = gfdl_mxtemp_summ.set_index('huc8')
+# gfdl_mxtemp_summ.columns = gfdl_mxtemp_summ.columns + '25'
+
+# gfdl_mxtemp_fall = pd.read_csv(gfdl_mxtemp_lst[2], index_col=0)
+# gfdl_mxtemp_fall = gfdl_mxtemp_fall.set_index('huc8')
+# gfdl_mxtemp_fall.columns = gfdl_mxtemp_fall.columns + '50'
+
+# gfdl_mxtemp_wint = pd.read_csv(gfdl_mxtemp_lst[3], index_col=0)
+# gfdl_mxtemp_wint = gfdl_mxtemp_wint.set_index('huc8')
+# gfdl_mxtemp_wint.columns = gfdl_mxtemp_wint.columns + '75'
+
+# gfdl_mxtemp_all = gfdl_mxtemp_spri.merge(gfdl_mxtemp_summ, on='huc8')
+# gfdl_mxtemp_all = gfdl_mxtemp_all.merge(gfdl_mxtemp_fall, on='huc8')
+# gfdl_mxtemp_all = gfdl_mxtemp_all.merge(gfdl_mxtemp_wint, on='huc8')
+
+# gfdl_mxtemp_avg = gfdl_mxtemp_all.sort_index(axis = 1).mean()
