@@ -3,6 +3,8 @@ import multiprocessing
 import threading
 
 import os
+import sys
+import tarfile
 import shutil
 import time
 import rasterio
@@ -31,6 +33,68 @@ def print_time(start, end, process = ""):
     print(process, "completed in", time_str)
     return
 
+
+def untar(in_dir):
+    ''' Decompress DSWE tarfiles, extract INWM file,
+        return list of raster objects ready to be mosaicked.'''
+
+    print("Beginning Decompression")
+
+    seasons = {'03':'Spring', '04':'Spring', '05':'Spring', \
+               '06':'Summer', '07':'Summer', '08':'Summer', \
+               '09':'Fall', '10':'Fall', '11':'Fall',\
+               '12':'Winter', '01':'Winter', '02':'Winter'}
+
+    # Get list of all tar files in our input directory
+    tar_lst = glob(in_dir + '/*.tar') #[t for t in os.listdir(in_dir) if t.endswith(".tar")]
+
+    for i in range(len(tar_lst)):
+        tarfilename = tar_lst[i]
+
+        yr = tarfilename[15:19]       # index file name to get year of collection
+        mnth = tarfilename[19:21]      # index to get month of collection
+        szn = seasons[mnth]
+
+        if mnth == '01' or mnth == '02':   # this will make sure our year winter
+            yr = str(int(yr) - 1)          # makes sense (Dec18, Jan19, Feb19) for the ./2018/Winter folder
+        
+        out_dir = os.path.join('../data/DSWE_SE/raw_tifs',yr,szn)
+            
+        inwm_file = tarfilename.replace("SW.tar", "INWM.tif")
+        tarfile_path = os.path.join(in_dir, tarfilename)
+
+        if os.path.exists(os.path.join(out_dir, inwm_file)): # if the file already exists
+            continue                                         # no need to untar it again
+
+        try:
+            tar = tarfile.open(tarfile_path)
+            tar.extract(inwm_file, path=out_dir)
+            tar.close()
+        except:
+            try:
+                inwm_file = tarfilename.replace("SW.tar", "INWAM.tif")
+                tarfile_path = os.path.join(in_dir, tarfilename)
+
+                if os.path.exists(os.path.join(out_dir, inwm_file)): # if the file already exists
+                    continue                                         # no need to untar it again
+
+                tar = tarfile.open(tarfile_path)
+                tar.extract(inwm_file, path=out_dir)
+                tar.close()
+            except:
+                try:
+                    print('Hit an error with tarfile {} and INWM {}'.format(tarfilename, inwm_file))
+                    print('Unexpected error:', sys.exc_info()[0])
+                    tar.close()
+                except UnboundLocalError:
+                    print('Hit another weird error. Apparently we could not declare the tar variable:', sys.exc_info()[0])
+
+        if not ((i+1) % 200): # most folders with tar files have 2,000 so we should get updates every 10%
+            print('{}% complete.'.format((i+1)/len(tar_lst) * 100))
+
+
+    print("Decompression Complete")
+    return
 
 def composite(path, window):
     """
@@ -160,6 +224,10 @@ def param_wrapper(p):
 
 ##### 
 def main():
+
+    # untar files (if needed)
+    tar_lst = ['../DSWE_SE/paper2_018_013-017_allYears', '../DSWE_SE/paper2_020-021_017_allYears', \
+               '../DSWE_SE/paper2_019012_allYears', '../DSWE_SE/paper2_019017_allYears']
 
     # get list of ARD tile names (all start with 0) in the study area
     tiles = pd.read_csv("../data/DSWE_SE/tiles.csv")

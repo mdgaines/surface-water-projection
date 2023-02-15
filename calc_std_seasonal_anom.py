@@ -146,19 +146,21 @@ for i in range(len(rcp_sznAvg_path_lst)):
 ##########################################
 
 # Get CSVs of mean and stdev of GRIDMET climate vars from 2000-2018
+# this is an avg and stdev of a seasonal sum for precip and a seasonal avg for mx temp (latter is okay, i think)
+# we need the annual sum for the table
 szn_dict = {'Sp':'SPRING', 'Su':'SUMMER', 'Fa':'FALL', 'Wi':'WINTER'}
 var_dict = {'Pr': 'PRECIP', 'maxTemp':'MAX_TEMP'}
 
 for szn in ['Sp', 'Su', 'Fa', 'Wi']:
     for var in ['Pr', 'maxTemp']:
 
-        outpath = f'../data/ClimateData/GRIDMET_AVG_STDEV/2000_2018_{szn_dict[szn]}_{var_dict[var]}_AVG_STDV.csv'
+        outpath = f'../data/ClimateData/GRIDMET_AVG_STDEV/1979_2008_{szn_dict[szn]}_{var_dict[var]}_AVG_STDV.csv'
 
         if not os.path.exists(outpath):
             
             cVar_lst = glob(f'../data/ClimateData/GRIDMET_AVG_STDEV/GRIDMET_YR_AVG/*{szn}_{var}*.csv')
             cVar_lst.sort()
-            cVar_lst = cVar_lst[21:40]
+            cVar_lst = cVar_lst[0:30] # 0-30 is 1979-2008
             for i in range(len(cVar_lst)):
                 cVar_df = pd.read_csv(cVar_lst[i], usecols=['huc8', 'mean'])
                 if i == 0:
@@ -168,3 +170,45 @@ for szn in ['Sp', 'Su', 'Fa', 'Wi']:
 
             out_df = pd.DataFrame({'huc8':df.set_index('huc8').T.mean().index,'mean':df.set_index('huc8').T.mean().values, 'std':df.set_index('huc8').T.std().values})
             out_df.to_csv(outpath)
+
+
+
+##########################################
+############ Study Area Table ############
+##########################################
+
+gridmet_mnth_lst = glob('../data/ClimateData/GRIDMET_AVG_STDEV/*MNTH*.csv')
+
+for j in range(len(gridmet_mnth_lst)):
+
+    yr = gridmet_mnth_lst[j].split('\\')[1].split('_')[1]
+
+    if int(yr) < 2009:
+        df = pd.read_csv(gridmet_mnth_lst[j])
+
+        lst = list(df.columns)
+        lst = [i for i in lst if '-' in i]
+        yr_cols = [i for i in lst if yr in i]
+        df = df[yr_cols]
+        lst_2 = ['-'.join([i.split('-')[0],i.split('-')[1].zfill(2)]) for i in lst if yr + '-' in i]
+
+        col_dict = dict(zip(yr_cols,lst_2))
+
+        df = df.rename(col_dict, axis='columns')
+        # df = df[lst_2]
+        df = df.reindex(sorted(df.columns), axis=1)
+        df = df.T
+
+        df = df[0].apply(lambda x: pd.Series(x.split(',')))
+        df['AVG_PRECIP'] = df[0].apply(lambda x: float(x[1:]))
+        df['AVG_MAX_TEMP'] = df[1].apply(lambda x: float(x[:-1]))
+        df = df.drop([0,1], axis=1)
+
+        if j == 0:
+            df_1979_2008 = df
+        else:
+            df_1979_2008 = pd.concat([df_1979_2008, df])
+
+mean_ann_precip_1979_2008 = df_1979_2008['AVG_PRECIP'].sum() / 30
+mean_ann_mxtemp_1979_2008 = df_1979_2008['AVG_MAX_TEMP'].mean() - 273.15    # put it in C for the paper
+
