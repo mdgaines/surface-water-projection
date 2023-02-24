@@ -49,7 +49,7 @@ def untar(in_dir):
     tar_lst = glob(in_dir + '/*.tar') #[t for t in os.listdir(in_dir) if t.endswith(".tar")]
 
     for i in range(len(tar_lst)):
-        tarfilename = tar_lst[i]
+        tarfilename = os.path.basename(tar_lst[i])
 
         yr = tarfilename[15:19]       # index file name to get year of collection
         mnth = tarfilename[19:21]      # index to get month of collection
@@ -72,22 +72,11 @@ def untar(in_dir):
             tar.close()
         except:
             try:
-                inwm_file = tarfilename.replace("SW.tar", "INWAM.tif")
-                tarfile_path = os.path.join(in_dir, tarfilename)
-
-                if os.path.exists(os.path.join(out_dir, inwm_file)): # if the file already exists
-                    continue                                         # no need to untar it again
-
-                tar = tarfile.open(tarfile_path)
-                tar.extract(inwm_file, path=out_dir)
+                print('Hit an error with tarfile {} and INWM {}'.format(tarfilename, inwm_file))
+                print('Unexpected error:', sys.exc_info()[0])
                 tar.close()
-            except:
-                try:
-                    print('Hit an error with tarfile {} and INWM {}'.format(tarfilename, inwm_file))
-                    print('Unexpected error:', sys.exc_info()[0])
-                    tar.close()
-                except UnboundLocalError:
-                    print('Hit another weird error. Apparently we could not declare the tar variable:', sys.exc_info()[0])
+            except UnboundLocalError:
+                print('Hit another weird error. Apparently we could not declare the tar variable:', sys.exc_info()[0])
 
         if not ((i+1) % 200): # most folders with tar files have 2,000 so we should get updates every 10%
             print('{}% complete.'.format((i+1)/len(tar_lst) * 100))
@@ -157,7 +146,7 @@ def tileProcess(tile, out_fldr, sub_fldr, fldr, szn_num):
         else:
             #### write a fully stacked raster for the year_szn_tile
             # read in rasters as stack
-            stack_path = '../temp/'+fldr[-4:]+szn_num+'_'+tile+'.tif' #'C:/Users/mdgaines/Documents/Research/temp/'+fldr[-4:]+szn_num+'_'+tile+'.tif'
+            stack_path = 'C:/Users/mdgaines/Documents/Research/temp/'+fldr[-4:]+szn_num+'_'+tile+'.tif' #'../temp/'+fldr[-4:]+szn_num+'_'+tile+'.tif' #
             array, raster_prof = es.stack(rstr_fl_lst, out_path = stack_path)
             del(array)
             del(raster_prof)
@@ -228,10 +217,13 @@ def main():
     # untar files (if needed)
     tar_lst = ['../DSWE_SE/paper2_018_013-017_allYears', '../DSWE_SE/paper2_020-021_017_allYears', \
                '../DSWE_SE/paper2_019012_allYears', '../DSWE_SE/paper2_019017_allYears']
+    
+    for fl in tar_lst:
+        untar(fl)
 
     # get list of ARD tile names (all start with 0) in the study area
-    tiles = pd.read_csv("../data/DSWE_SE/tiles.csv")
-    tiles['Unique_Tiles'] = tiles['Unique_Tiles'].apply(lambda x: str(x).zfill(6))
+    tiles = pd.read_csv("../data/DSWE_SE/tiles_p2.csv")
+    tiles['Unique_Tiles'] = tiles['tile'].apply(lambda x: str(x).zfill(6))
 
     # data_path = 'C:/Users/mdgaines/Documents/Research'
     raw_tif_path = '../data/DSWE_SE/raw_tifs' #os.path.join(data_path,'data/DSWE_SE/raw_tifs')
@@ -269,17 +261,22 @@ def main():
 
             print(out_fldr)
             if not os.path.exists(out_fldr):
-                
                 if not os.path.exists(os.path.dirname(out_fldr)):
                     os.mkdir(os.path.dirname(out_fldr))
                 os.mkdir(out_fldr)
-            else:
-                print(out_fldr, "has already been processed.")
-
 
             tile_lst = tiles.Unique_Tiles
 
-            params = ((t, out_fldr, sub_fldr, fldr, szn_num) for t in tile_lst)
+            to_proc_tile_lst = []
+
+            for tile in tile_lst:
+                out_fl_path = os.path.join(out_fldr, fldr[-4:] + szn_num + '_' + tile + '_composite.tif')
+                if not os.path.exists(out_fl_path):
+                    to_proc_tile_lst.append(tile)
+                else:
+                    print(os.path.basename(out_fl_path), "already exists.")
+
+            params = ((t, out_fldr, sub_fldr, fldr, szn_num) for t in to_proc_tile_lst)
 
             # can use ProcessPoolExecutor because we are reading and writing different files in each core
             with concurrent.futures.ProcessPoolExecutor(
@@ -295,9 +292,9 @@ def main():
         end_time_yr = time.time()
         print_time(start_time_yr, end_time_yr)
 
-        if os.path.exists(fldr):
-            shutil.rmtree(fldr)
-            print(os.path.basename(fldr), "deleted.")
+        # if os.path.exists(fldr):
+        #     shutil.rmtree(fldr)
+        #     print(os.path.basename(fldr), "deleted.")
 
 
 
