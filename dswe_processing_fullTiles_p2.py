@@ -7,11 +7,13 @@ import sys
 import tarfile
 import shutil
 import time
+import zipfile
 import rasterio
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
 from glob import glob
+from rasterstats import zonal_stats
 import matplotlib.pyplot as plt
 from rasterio.plot import plotting_extent
 import geopandas as gpd
@@ -211,6 +213,72 @@ def param_wrapper(p):
     return tileProcess(*p)
 
 
+
+def process(fldr):
+    start_fldr = time.time()
+
+    szn = os.path.basename(fldr)[6:]
+    yr = os.path.basename(os.path.dirname(fldr))
+    out_path = os.path.join('../data/DSWE_SE/huc_stats_p2',yr+'_'+szn+'.csv')
+
+    print(yr, szn, 'in process', os.getpid())
+
+    if os.path.exists(out_path):
+        print(out_path, 'already exists.')
+        return
+
+    tif_paths = glob(os.path.join(fldr,'*.tif'))
+
+    for i in range(len(tif_paths)):
+        start_tif = time.time()
+        if i == 0:
+            src = rasterio.open(tif_paths[i])
+            shp = gpd.read_file('../data/Shapefiles/HUC08/HUC08_paper2/HUC08_paper2.shp')
+            huc8_reproj = shp.to_crs(crs=src.crs.to_dict())
+            # point_reproj = pt_shp.to_crs(dataset.crs.to_dict())
+            del(shp)
+            huc8 = huc8_reproj[['huc8','geometry']]
+            del(huc8_reproj)
+            huc8_df = pd.DataFrame(huc8['huc8'])
+            huc8_df['total_water'] = 0
+
+
+        else:
+            src = rasterio.open(tif_paths[i])
+
+        array = src.read(5)
+        affine = src.transform
+
+        water_array = (array > 24).astype('uint8')
+        del(array)
+
+        # water_arr = ma.masked_where(array >= 25, array)
+        # del(array)
+        # water_array = water_arr.mask * 1
+        # water_array = water_array.astype('uint8')
+
+        zs = zonal_stats(huc8, water_array, affine=affine, stats=['sum'], nodata=0, all_touched = False)
+
+        del(water_array)
+
+        zs_df = pd.DataFrame(zs)
+        zs_df = zs_df.fillna(0)
+
+        huc8_df['total_water'] += zs_df['sum']
+        # print(szn, os.path.basename(tif_paths[i]), 'completed')
+        # print(huc8_df.head())
+
+        src.close()
+        end_tif = time.time()
+        print_time(start_tif, end_tif, szn + os.path.basename(tif_paths[i]))
+
+    huc8_df.to_csv(out_path, index=False)
+    end_fldr = time.time()
+    print_time(start_fldr, end_fldr, yr+szn+'FINISHED!')
+    # print(yr,szn,'FINISHED!')
+    return
+
+
 ##### 
 def main():
 
@@ -218,8 +286,8 @@ def main():
     tar_lst = ['../DSWE_SE/paper2_018_013-017_allYears', '../DSWE_SE/paper2_020-021_017_allYears', \
                '../DSWE_SE/paper2_019012_allYears', '../DSWE_SE/paper2_019017_allYears']
     
-    for fl in tar_lst:
-        untar(fl)
+    # for fl in tar_lst:
+    #     untar(fl)
 
     # get list of ARD tile names (all start with 0) in the study area
     tiles = pd.read_csv("../data/DSWE_SE/tiles_p2.csv")
@@ -295,6 +363,31 @@ def main():
         # if os.path.exists(fldr):
         #     shutil.rmtree(fldr)
         #     print(os.path.basename(fldr), "deleted.")
+
+
+    # proc_tif_paths = glob('../data/DSWE_SE/processed_tifs/*/*/*.tif')
+
+    yr_szn_lst = glob('../data/DSWE_SE/processed_tifs/*/*[!.ini]')
+
+    # check if csv's have already been made
+    for yr_szn in yr_szn_lst:
+        szn = os.path.basename(yr_szn)[6:]
+        yr = os.path.basename(os.path.dirname(yr_szn))
+        out_path = os.path.join('../data/DSWE_SE/huc_stats_p2',yr+'_'+szn+'.csv')
+
+        # if csv's exist, delete the folder from temp
+        if os.path.exists(out_path):
+            # shutil.rmtree(yr_szn)
+            print("{0} {1} already processed.".format(yr, szn))
+            continue
+
+    # run zonal stats in 4 processes
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=4
+    ) as executor:
+        executor.map(process, yr_szn_lst)
+    
+    print('finished', yr_szn_lst)
 
 
 

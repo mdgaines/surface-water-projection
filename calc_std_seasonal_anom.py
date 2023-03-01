@@ -212,3 +212,32 @@ for j in range(len(gridmet_mnth_lst)):
 mean_ann_precip_1979_2008 = df_1979_2008['AVG_PRECIP'].sum() / 30
 mean_ann_mxtemp_1979_2008 = df_1979_2008['AVG_MAX_TEMP'].mean() - 273.15    # put it in C for the paper
 
+#### DATA PATHS
+precip_paths = glob('../data/ClimateData/macav2livneh_studyArea_avgs/*PRECIP.csv')
+
+mxtemp_paths = glob('../data/ClimateData/macav2livneh_studyArea_avgs/*MAX-TEMP.csv')
+
+# looking for 2000, 2020, 2040, 2060, 2080, and 2099 values
+for i in range(len(precip_paths)):
+    print('\n', os.path.basename(precip_paths[i])[:-4])
+    df = pd.read_csv(precip_paths[i], index_col=0)
+
+    df['YEAR'] = df['DATE'].apply(lambda x: x.split('-')[0])
+
+    print('{0}\n'.format(df[df['YEAR']=='2000']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008))
+    # df[df['YEAR']=='2020']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008, df[df['YEAR']=='2040']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008,
+    # df[df['YEAR']=='2060']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008, df[df['YEAR']=='2080']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008,
+    # df[df['YEAR']=='2099']['PRECIP_AVG'].sum() - mean_ann_precip_1979_2008))
+
+
+
+for i in range(len(mxtemp_paths)):
+    print('\n', os.path.basename(mxtemp_paths[i])[:-4])
+    df = pd.read_csv(mxtemp_paths[i], index_col=0)
+
+    df['YEAR'] = df['DATE'].apply(lambda x: x.split('-')[0])
+
+    print('{0}\n'.format(df[df['YEAR']=='2000']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008))
+    # df[df['YEAR']=='2020']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008, df[df['YEAR']=='2040']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008,
+    # df[df['YEAR']=='2060']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008, df[df['YEAR']=='2080']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008,
+    # df[df['YEAR']=='2099']['MAX_TEMP_AVG'].mean()  - 273.15 - mean_ann_mxtemp_1979_2008))
