@@ -208,6 +208,9 @@ def calc_error_correlation(precip_path=str, mxTemp_path=str, png_outpath=str, \
         print(f'MAX_TEMP and PRECIP errors are independent for {os.path.basename(png_outpath)[:-4]}')
         json_dict['SIGMA'] = [sigma_x, sigma_y]
 
+        with open('../data/proj_var_error_independence_p2.txt', 'a') as file:
+            file.write(f'MAX_TEMP and PRECIP errors are independent for {os.path.basename(png_outpath)[:-4]}')
+
     json_dict['MU'] = [mu_x, mu_y]
     json_dict['RHO'] = rho
 
@@ -284,19 +287,33 @@ def calc_trivar_error_correlation(agri_path=str, ints_path=str, frst_path=str, s
         json_dict['SIGMA_AGRI_INTS'] = [[sigma_x**2, rho_xy*sigma_x*sigma_y],
                                         [rho_xy*sigma_x*sigma_y, sigma_y**2]]
         json_dict['SIGMA_FRST'] = sigma_z
+
+        with open('../data/proj_var_error_independence_p2.txt', 'a') as file:
+            file.write(f'FRST errors are independent for {os.path.basename(frst_path)[:-4]}')
+    
     elif p_val_xz < 0.01:
         json_dict['SIGMA_AGRI_FRST'] = [[sigma_x**2, rho_xz*sigma_x*sigma_z],
                                         [rho_xz*sigma_x*sigma_z, sigma_z**2]]
         json_dict['SIGMA_INTS'] = sigma_y
+
+        with open('../data/proj_var_error_independence_p2.txt', 'a') as file:
+            file.write(f'INTS errors are independent for {os.path.basename(ints_path)[:-4]}')
+
     elif p_val_yz < 0.01:
         json_dict['SIGMA_INTS_FRST'] = [[sigma_y**2, rho_yz*sigma_y*sigma_z],
                                         [rho_yz*sigma_y*sigma_z, sigma_z**2]]
         json_dict['SIGMA_AGRI'] = sigma_x
-    
+
+        with open('../data/proj_var_error_independence_p2.txt', 'a') as file:
+            file.write(f'AGRI errors are independent for {os.path.basename(agri_path)[:-4]}')
+
     else:
         print(f'All LCLU errors are independent for {os.path.basename(agri_path)[:-4]}')
         json_dict['SIGMA'] = [sigma_x, sigma_y, sigma_z]
 
+        with open('../data/proj_var_error_independence_p2.txt', 'a') as file:
+            file.write(f'All LCLU errors are independent for {os.path.basename(frst_path)[:-4]}')
+    
     json_dict['MU'] = [mu_x, mu_y, mu_z]
     json_dict['RHO'] = [rho_xy, rho_xz, rho_yz]
     json_dict['P_VALS'] = p_val_lst
@@ -439,6 +456,9 @@ def main():
     ###############################################
     #### make bivariate plots and save bivaraite variables ####
     ###############################################
+    with open('../data/proj_var_error_independence_p2.txt', 'w') as file:
+        file.write('List of scenarios with independent projected variable errors. \n')
+
     for var_group in var_group_lst:
         for huc4 in huc4_lst:
             if var_group == 'Climate':

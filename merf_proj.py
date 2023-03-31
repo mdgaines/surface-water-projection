@@ -16,6 +16,7 @@ from merf.viz import plot_merf_training_stats
 from sklearn.inspection import plot_partial_dependence
 # import shap
 import math
+import time
 
 import seaborn as sns
 from matplotlib import cm
@@ -23,6 +24,16 @@ from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import r2_score
+
+
+def print_time(start, end, process = ""):
+    """
+        prints message with elapsed time of process
+    """
+    elapsed = end - start
+    time_str = time.strftime("%H hr %M min %S sec", time.gmtime(elapsed))
+    print(process, "completed in", time_str)
+    return
 
 
 def _get_Z_matrix(Z_values=np.array, Z_vars=list):
@@ -44,9 +55,9 @@ def _get_Z_matrix(Z_values=np.array, Z_vars=list):
 
 def get_merf_model(train, Z_vars:list=['SEASON', 'HUC04'], clusters:str='HUC08'):
     
-    rf_fe_b = RandomForestRegressor(n_estimators = 100, random_state = 42)
+    rf_fe_b = RandomForestRegressor(n_estimators = 1000, random_state = 42)
 
-    mrf = MERF(rf_fe_b, max_iterations=3)
+    mrf = MERF(rf_fe_b, max_iterations=200)
     X_train = train[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
     clusters_train = train[clusters]
     y_train = train['LOG_PR_WATER']
@@ -152,11 +163,11 @@ def get_random_error_dict_climate(json_path=str):
         sigma = json_dict[key]['SIGMA']
 
         if np.array(json_dict[key]['SIGMA']).shape == (2,2):
-            rand_num_dict[key] = np.random.multivariate_normal(mu, sigma, 1000)
+            rand_num_dict[key] = np.random.multivariate_normal(mu, sigma, 10000)
         else:
-            rand_x = np.random.normal(mu[0], sigma[0], 1000)
-            rand_y = np.random.normal(mu[1], sigma[1], 1000)
-            rand_num_dict[key] = [[rand_x[i], rand_y[i]] for i in range(1000)]
+            rand_x = np.random.normal(mu[0], sigma[0], 10000)
+            rand_y = np.random.normal(mu[1], sigma[1], 10000)
+            rand_num_dict[key] = [[rand_x[i], rand_y[i]] for i in range(10000)]
 
     return(rand_num_dict)
 
@@ -182,28 +193,28 @@ def get_random_error_dict_lclu(json_path=str):
         if len(json_dict[key]) == 5:
             sigma = json_dict[key]['SIGMA_ALL']
             mu = json_dict[key]['MU']
-            rand_num_dict[key] = np.random.multivariate_normal(mu, sigma, 1000)
+            rand_num_dict[key] = np.random.multivariate_normal(mu, sigma, 10000)
         elif 'SIGMA_FRST' in json_dict[key].keys() and len(json_dict[key]) == 6:
             # AGRI and INTS are related (xy)
-            rand_xy = np.random.multivariate_normal([mu[0], mu[1]], json_dict[key]['SIGMA_AGRI_INTS'], 1000)
-            rand_z = np.random.normal(mu[2], json_dict[key]['SIGMA_FRST'], 1000)
-            rand_num_dict[key] = [[rand_xy[i][0], rand_xy[i][1], rand_z[i]] for i in range(1000)]
+            rand_xy = np.random.multivariate_normal([mu[0], mu[1]], json_dict[key]['SIGMA_AGRI_INTS'], 10000)
+            rand_z = np.random.normal(mu[2], json_dict[key]['SIGMA_FRST'], 10000)
+            rand_num_dict[key] = [[rand_xy[i][0], rand_xy[i][1], rand_z[i]] for i in range(10000)]
         elif 'SIGMA_INTS' in json_dict[key].keys() and len(json_dict[key]) == 6:
             # AGRI and FRST are related (xz)
-            rand_xz = np.random.multivariate_normal([mu[0], mu[2]], json_dict[key]['SIGMA_AGRI_FRST'], 1000)
-            rand_y = np.random.normal(mu[1], json_dict[key]['SIGMA_INTS'], 1000)
-            rand_num_dict[key] = [[rand_xz[i][0], rand_y[i], rand_xz[i][1]] for i in range(1000)]
+            rand_xz = np.random.multivariate_normal([mu[0], mu[2]], json_dict[key]['SIGMA_AGRI_FRST'], 10000)
+            rand_y = np.random.normal(mu[1], json_dict[key]['SIGMA_INTS'], 10000)
+            rand_num_dict[key] = [[rand_xz[i][0], rand_y[i], rand_xz[i][1]] for i in range(10000)]
         elif 'SIGMA_AGRI' in json_dict[key].keys() and len(json_dict[key]) == 6:
             # INTS and FRST are related (yz)
-            rand_yz = np.random.multivariate_normal([mu[1], mu[2]], json_dict[key]['SIGMA_INTS_FRST'], 1000)
-            rand_x = np.random.normal(mu[0], json_dict[key]['SIGMA_AGRI'], 1000)
-            rand_num_dict[key] = [[rand_x[i], rand_yz[i][0], rand_yz[i][1]] for i in range(1000)]
+            rand_yz = np.random.multivariate_normal([mu[1], mu[2]], json_dict[key]['SIGMA_INTS_FRST'], 10000)
+            rand_x = np.random.normal(mu[0], json_dict[key]['SIGMA_AGRI'], 10000)
+            rand_num_dict[key] = [[rand_x[i], rand_yz[i][0], rand_yz[i][1]] for i in range(10000)]
         else:
             # all independent
-            rand_x = np.random.normal(mu[0], json_dict[key]['SIGMA_AGRI'], 1000)
-            rand_y = np.random.normal(mu[1], json_dict[key]['SIGMA_INTS'], 1000)
-            rand_z = np.random.normal(mu[2], json_dict[key]['SIGMA_FRST'], 1000)
-            rand_num_dict[key] = [[rand_x[i], rand_y[i], rand_z[i]] for i in range(1000)]
+            rand_x = np.random.normal(mu[0], json_dict[key]['SIGMA_AGRI'], 10000)
+            rand_y = np.random.normal(mu[1], json_dict[key]['SIGMA_INTS'], 10000)
+            rand_z = np.random.normal(mu[2], json_dict[key]['SIGMA_FRST'], 10000)
+            rand_num_dict[key] = [[rand_x[i], rand_y[i], rand_z[i]] for i in range(10000)]
 
     return(rand_num_dict)
 
@@ -212,15 +223,10 @@ def normalize_climate_vars(df=pd.DataFrame, szn=str, var=str, gcm=str, scn=str):
 
     avgStd_df = pd.read_csv(f'../data/ClimateData/GRIDMET_AVG_STDEV/2000_2018_{szn}_{var}_AVG_STDV.csv', index_col=0)
     avgStd_df = avgStd_df.sort_values('huc8')
-    # avgStd_mxTemp_df = pd.read_csv(f'../data/ClimateData/GRIDMET_AVG_STDEV/2000_2018_{szn}_MAX_TEMP_AVG_STDV.csv', index_col=0)
-    # avgStd_mxTemp_df = avgStd_mxTemp_df.sort_values('huc8')
 
     temp_df = df.merge(avgStd_df, left_on='HUC08', right_on='huc8')
 
     temp_df.iloc[:,1] = (temp_df.iloc[:,1] - temp_df['mean']) / temp_df['std']
-
-    # for col in mxTemp_df.columns[1:]:
-    #     mxTemp_df[col] =( mxTemp_df[col] - avgStd_mxTemp_df['mean']) / avgStd_mxTemp_df['std']
 
     return(temp_df.iloc[:,0:2])
 
@@ -241,7 +247,7 @@ def process(data_fl,
     '''
 
     i = int(outpath.split('_')[-1].split('.')[0])
-    print(i)
+
     # Add random variance to climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring','PRECIP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
         json_dict=spring_cl_dict, i=i, var=0)
@@ -262,8 +268,6 @@ def process(data_fl,
         json_dict=winter_cl_dict, i=i, var=0)
     data_fl.loc[data_fl['SEASON'] == 'Winter','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
         json_dict=winter_cl_dict, i=i, var=1)
-
-    print(data_fl.head())
 
     # normalize climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','PRECIP']], \
@@ -300,11 +304,6 @@ def process(data_fl,
     # Save file
     data_fl.to_csv(outpath)
 
-    if os.path.exists(outpath):
-        print(f'{os.path.basename(outpath)} written')
-    else:
-        print('got through processing but did not save')
-
     return()
 
 
@@ -314,10 +313,9 @@ def param_wrapper(p):
 
 def main():
 
-    GCM_LST = ['GFDL']#, 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
-    SCENARIO_LST = ['RCP45']#, 'RCP85']
-    FORESCE_LST = ['A1B']#, 'A2', 'B1', 'B2']
-    # SEASON_LST = ['SPRING', 'SUMMER', 'FALL', 'WINTER']
+    GCM_LST = ['GFDL', 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
+    SCENARIO_LST = ['RCP45', 'RCP85']
+    FORESCE_LST = ['A1B', 'A2', 'B1', 'B2']
 
     train, test, dswe = get_dswe_split(test_split=0.2)
 
@@ -333,6 +331,9 @@ def main():
     for gcm in GCM_LST:
         for foresce in FORESCE_LST:
             for scn in SCENARIO_LST:
+
+                start_time_scenario = time.time()
+
                 data_fl = pd.read_csv(f'../data/FutureData/GCM_FORESCE_CSVs/{gcm}_{scn}_{foresce}_ALL.csv', index_col=0)
 
                 json_cl_lst = glob(f'../data/ClimateData/*JSONs/{gcm}/*/{gcm}*{scn}*.json')
@@ -346,7 +347,7 @@ def main():
 
                 to_proc_outpath_lst = []
 
-                for i in range(3):
+                for i in range(10000):
                     outpath = f'../data/FutureData/GCM_FORESCE_CSVs/{gcm}/{gcm}_{scn}_{foresce}/{gcm}_{scn}_{foresce}_{i}.csv'
 
                     if not os.path.exists(outpath):
@@ -359,9 +360,6 @@ def main():
                 params = ((data_fl, path, merf_model, dswe, \
                            spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
                            lclu_dict, gcm, scn) for path in to_proc_outpath_lst)
-                # params = [(data_fl, path, merf_model, dswe, \
-                #         spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
-                #         lclu_dict, gcm, scn) for path in to_proc_outpath_lst]
 
                 # # can use ProcessPoolExecutor because we are reading and writing different files in each core
                 with concurrent.futures.ProcessPoolExecutor(
@@ -369,13 +367,8 @@ def main():
                 ) as executor:
                     executor.map(param_wrapper, params)
 
-                #     t = [executor.submit(process, data_fl, path, merf_model, dswe, \
-                #            spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
-                #            lclu_dict, gcm, scn) for path in to_proc_outpath_lst]
-
-                # with multiprocessing.Pool(4) as pool:
-                #     pool.map(param_wrapper, params)
-
+                end_time_scenario = time.time()
+                print_time(start_time_scenario, end_time_scenario)
                 print(f'{gcm}_{scn}_{foresce} done')
 
 if __name__ == '__main__':
