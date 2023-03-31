@@ -4,6 +4,10 @@ import pandas as pd
 from glob import glob
 import json
 
+import concurrent.futures
+import multiprocessing
+import threading
+
 from merf import MERF
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.ensemble import RandomForestRegressor
@@ -21,28 +25,117 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 
 
-def get_merf_model():
+def _get_Z_matrix(Z_values=np.array, Z_vars=list):
+    '''
+        calculate Z matrix from input variables and selected random effects
+    '''
+    for i in range(len(Z_vars)):
+        Z_vars_array = Z_values[Z_vars[i]].unique()
+        if i == 0:
+            # Z_vars_array = Z_values[Z_vars[i]].unique()
+            Z_df = pd.DataFrame(data=0, columns=Z_vars_array, index=Z_values.index)
+        # else:
+            # Z_vars_array = np.append(Z_vars_array, Z_values[Z_vars[i]].unique())
+        for col in Z_vars_array:
+            Z_df[col] = np.where(Z_values[Z_vars[i]] == col, 1, 0)
+
+    return(Z_df)
+
+
+def get_merf_model(train, Z_vars:list=['SEASON', 'HUC04'], clusters:str='HUC08'):
     
-    dswe = pd.read_csv('../data/all_data_0018.csv', index_col=0)
-    dswe['MAX_TMP'] = dswe['MAX_TMP'] * -1
-    dswe['MIN_TMP'] = dswe['MIN_TMP'] * -1
-    dswe['PRECIP'] = dswe['PRECIP'] * -1
-    dswe['HUC_SEASON'] = dswe['HUC08'].astype('str') + '_' + dswe['SEASON']
-
-    dswe = dswe.rename(columns={"PR_WATER": "LOG_PR_WATER"})
-
-    train, test = train_test_split(dswe, test_size=0.2, shuffle=True)
     rf_fe_b = RandomForestRegressor(n_estimators = 1000, random_state = 42)
 
-    mrf_both2 = MERF(rf_fe_b, max_iterations=10)
-    X_train_both2 = train[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
-    Z_train_both2 = np.ones((len(X_train_both2), 1))
-    clusters_train_both2 = train['HUC_SEASON']
-    y_train_both2 = train['LOG_PR_WATER']
-    mrf_both2.fit(X_train_both2, Z_train_both2, clusters_train_both2, y_train_both2)
+    mrf = MERF(rf_fe_b, max_iterations=10)
+    X_train = train[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
+    clusters_train = train[clusters]
+    y_train = train['LOG_PR_WATER']
 
-    return(mrf_both2)
+    if Z_vars is None:
+        Z_train = np.ones((len(X_train), 1))
+    else:
+        Z_values = train[Z_vars]
+        Z_train = _get_Z_matrix(Z_values, Z_vars)
 
+    mrf.fit(X_train, Z_train, clusters_train, y_train)
+
+    return(mrf)
+
+
+def get_dswe_split(test_split:float=0.2):
+    dswe = pd.read_csv('../data/all_data_0118_p2.csv', index_col=0)
+    dswe['HUC_SEASON'] = dswe['HUC08'].astype('str') + '_' + dswe['SEASON']
+
+    dswe['LOG_PR_WATER'] = np.log(dswe['PR_WATER'] + 10e-6)
+
+    # save orignial values pre-center/standardize
+    dswe['MAX_TMP_OG'] = dswe['MAX_TMP']
+    dswe['PRECIP_OG'] = dswe['PRECIP']
+    dswe['PR_AG_OG'] = dswe['PR_AG']
+    dswe['PR_NAT_OG'] = dswe['PR_NAT']
+    dswe['PR_INT_OG'] = dswe['PR_INT']
+
+    # center and standardize independent variables
+    dswe['MAX_TMP'] = (dswe['MAX_TMP'] - np.mean(dswe['MAX_TMP'])) / np.std(dswe['MAX_TMP'])
+    dswe['PRECIP'] = (dswe['PRECIP'] - np.mean(dswe['PRECIP'])) / np.std(dswe['PRECIP'])
+
+    dswe['PR_AG'] = (dswe['PR_AG'] - np.mean(dswe['PR_AG'])) / np.std(dswe['PR_AG'])
+    dswe['PR_NAT'] = (dswe['PR_NAT'] - np.mean(dswe['PR_NAT'])) / np.std(dswe['PR_NAT'])
+    dswe['PR_INT'] = (dswe['PR_INT'] - np.mean(dswe['PR_INT'])) / np.std(dswe['PR_INT'])
+
+    dswe['HUC04'] = dswe['HUC08'].apply(lambda x: str(x)[0:3].zfill(4))
+
+    train, test = train_test_split(dswe, test_size=test_split, shuffle=True, random_state=42)
+
+    return(train, test, dswe)
+
+
+def get_merf_error_stats(
+        mrf,
+        test:pd.DataFrame, 
+        Z_vars:list=['SEASON', 'HUC04'], 
+        clusters:str='HUC08'):
+
+    X_test = test[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
+    clusters_test = test[clusters]
+    y_test = test['LOG_PR_WATER']
+
+    Z_values = test[Z_vars]
+    Z_test = _get_Z_matrix(Z_values, Z_vars)
+
+    y_hat_test = mrf.predict(X_test, Z_test, clusters_test)
+
+    mse_test = np.mean((y_test - y_hat_test) ** 2)
+    rmspe_test = math.sqrt(np.mean( (y_test - y_hat_test) ** 2)) * 100
+    mpe_test = np.mean(((y_test-y_hat_test) / y_test) * 100)
+    r2_test = r2_score(y_test, y_hat_test)
+
+    return(mse_test, rmspe_test, mpe_test, r2_test)
+
+
+def setup_merf_future(
+        future_df:pd.DataFrame,
+        Z_vars:list,
+        clusters:str,
+        obs_data:pd.DataFrame):
+    # obs_data = pd.read_csv('../data/all_data_0118_p2.csv', index_col=0)
+
+    # center and standardize independent variables based on the obs data used to train the model
+    future_df['MAX_TMP'] = (future_df['MAX_TMP'] - np.mean(obs_data['MAX_TMP_OG'])) / np.std(obs_data['MAX_TMP_OG'])
+    future_df['PRECIP'] = (future_df['PRECIP'] - np.mean(obs_data['PRECIP_OG'])) / np.std(obs_data['PRECIP_OG'])
+
+    future_df['PR_AG'] = (future_df['PR_AG'] - np.mean(obs_data['PR_AG_OG'])) / np.std(obs_data['PR_AG_OG'])
+    future_df['PR_NAT'] = (future_df['PR_NAT'] - np.mean(obs_data['PR_NAT_OG'])) / np.std(obs_data['PR_NAT_OG'])
+    future_df['PR_INT'] = (future_df['PR_INT'] - np.mean(obs_data['PR_INT_OG'])) / np.std(obs_data['PR_INT_OG'])
+
+    X_future = future_df[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
+    Z_values = future_df[Z_vars]
+    Z_future = _get_Z_matrix(Z_values, Z_vars)
+
+    clusters_future = future_df[clusters]
+
+    return(X_future, Z_future, clusters_future)
+    
 
 def get_random_error_dict_climate(json_path=str):
 
@@ -131,8 +224,85 @@ def normalize_climate_vars(df=pd.DataFrame, szn=str, var=str, gcm=str, scn=str):
 
     return(temp_df.iloc[:,0:2])
 
-# dswe_future_a1b85 = pd.read_csv('../data/FutureData/2006_2099_A1b_FORESCE_RCP85_GFDLESM2M.csv', index_col=0)
 
+def process(data_fl, 
+            outpath, 
+            merf_model, 
+            dswe, 
+            spring_cl_dict, 
+            summer_cl_dict, 
+            fall_cl_dict, 
+            winter_cl_dict, 
+            lclu_dict, 
+            gcm,
+            scn):
+    '''
+        Processes each Monte Carlo run and saves the output file
+    '''
+
+    i = outpath.split('_')[-1].split('.')[0]
+
+    # Add random variance to climate data
+    data_fl.loc[data_fl['SEASON'] == 'Spring','PRECIP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
+        json_dict=spring_cl_dict, i=i, var=0)
+    data_fl.loc[data_fl['SEASON'] == 'Spring','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
+        json_dict=spring_cl_dict, i=i, var=1)
+
+    data_fl.loc[data_fl['SEASON'] == 'Summer','PRECIP'] += data_fl[data_fl['SEASON'] == 'Summer']['HUC08'].apply(add_random_error, \
+        json_dict=summer_cl_dict, i=i, var=0)
+    data_fl.loc[data_fl['SEASON'] == 'Summer','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Summer']['HUC08'].apply(add_random_error, \
+        json_dict=summer_cl_dict, i=i, var=1)
+
+    data_fl.loc[data_fl['SEASON'] == 'Fall','PRECIP'] += data_fl[data_fl['SEASON'] == 'Fall']['HUC08'].apply(add_random_error, \
+        json_dict=fall_cl_dict, i=i, var=0)
+    data_fl.loc[data_fl['SEASON'] == 'Fall','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Fall']['HUC08'].apply(add_random_error, \
+        json_dict=fall_cl_dict, i=i, var=1)
+
+    data_fl.loc[data_fl['SEASON'] == 'Winter','PRECIP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
+        json_dict=winter_cl_dict, i=i, var=0)
+    data_fl.loc[data_fl['SEASON'] == 'Winter','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
+        json_dict=winter_cl_dict, i=i, var=1)
+
+    # normalize climate data
+    data_fl.loc[data_fl['SEASON'] == 'Spring',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','PRECIP']], \
+        szn='SPRING', var='PRECIP', gcm=gcm, scn=scn)
+    data_fl.loc[data_fl['SEASON'] == 'Spring',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','MAX_TMP']], \
+        szn='SPRING', var='MAX_TEMP', gcm=gcm, scn=scn)
+
+    data_fl.loc[data_fl['SEASON'] == 'Summer',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Summer',['HUC08','PRECIP']], \
+        szn='SUMMER', var='PRECIP', gcm=gcm, scn=scn)
+    data_fl.loc[data_fl['SEASON'] == 'Summer',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Summer',['HUC08','MAX_TMP']], \
+        szn='SUMMER', var='MAX_TEMP', gcm=gcm, scn=scn)
+
+    data_fl.loc[data_fl['SEASON'] == 'Fall',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Fall',['HUC08','PRECIP']], \
+        szn='FALL', var='PRECIP', gcm=gcm, scn=scn)
+    data_fl.loc[data_fl['SEASON'] == 'Fall',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Fall',['HUC08','MAX_TMP']], \
+        szn='FALL', var='MAX_TEMP', gcm=gcm, scn=scn)
+
+    data_fl.loc[data_fl['SEASON'] == 'Winter',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Winter',['HUC08','PRECIP']], \
+        szn='WINTER', var='PRECIP', gcm=gcm, scn=scn)
+    data_fl.loc[data_fl['SEASON'] == 'Winter',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Winter',['HUC08','MAX_TMP']], \
+        szn='WINTER', var='MAX_TEMP', gcm=gcm, scn=scn)
+
+    # add random variace for lclu data
+    data_fl['PR_AG'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=0)
+    data_fl['PR_INT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=1)
+    data_fl['PR_NAT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=2)
+
+    # Set up MERF model
+    X_future, Z_future, clusters_future = setup_merf_future(data_fl, Z_vars=['SEASON'], clusters='HUC08', obs_data=dswe)
+    
+    # Run MERF model
+    y_hat_test = merf_model.predict(X_future, Z_future, clusters_future)
+    data_fl['PRED_LOG_WATER'] = y_hat_test
+    # Save file
+    data_fl.to_csv(outpath)
+
+    return
+
+
+def param_wrapper(p):
+    return process(*p)
 
 
 def main():
@@ -142,7 +312,16 @@ def main():
     FORESCE_LST = ['A1B', 'A2', 'B1', 'B2']
     # SEASON_LST = ['SPRING', 'SUMMER', 'FALL', 'WINTER']
 
-    merf_model = get_merf_model()
+    train, test, dswe = get_dswe_split(test_split=0.2)
+
+    merf_model = get_merf_model(train=train, Z_vars=['SEASON'], clusters='HUC08')
+
+    mse_test, rmspe_test, mpe_test, r2_test = get_merf_error_stats(merf_model, test, Z_varss=['SEASON'], clusters='HUC08')
+
+    print('MSE:', mse_test)
+    print('RMSPE:', rmspe_test)
+    print('MPE:', mpe_test)
+    print('R2:', r2_test)
 
     for gcm in GCM_LST:
         for foresce in FORESCE_LST:
@@ -158,72 +337,28 @@ def main():
                 json_lclu = glob(f'../data/LandCover/*JSONs/*{foresce}.json')[0]
                 lclu_dict = get_random_error_dict_lclu(json_lclu)
 
-                for i in range(100):
+                to_proc_outpath_lst = []
+
+                for i in range(10):
                     outpath = f'../data/FutureData/GCM_FORESCE_CSVs/{gcm}/{gcm}_{scn}_{foresce}/{gcm}_{scn}_{foresce}_{i}.csv'
 
                     if not os.path.exists(outpath):
                         if not os.path.exists(os.path.dirname(outpath)):
                             os.makedirs(os.path.dirname(outpath))
+                    
+                        to_proc_outpath_lst.append(outpath)
 
-                        # Add random variance to climate data
-                        data_fl.loc[data_fl['SEASON'] == 'Spring','PRECIP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
-                            json_dict=spring_cl_dict, i=i, var=0)
-                        data_fl.loc[data_fl['SEASON'] == 'Spring','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
-                            json_dict=spring_cl_dict, i=i, var=1)
+                # Add random variance to climate data
+                params = ((data_fl, outpath, merf_model, dswe, \
+                           spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
+                           lclu_dict, gcm, scn) for t in to_proc_outpath_lst)
 
-                        data_fl.loc[data_fl['SEASON'] == 'Summer','PRECIP'] += data_fl[data_fl['SEASON'] == 'Summer']['HUC08'].apply(add_random_error, \
-                            json_dict=summer_cl_dict, i=i, var=0)
-                        data_fl.loc[data_fl['SEASON'] == 'Summer','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Summer']['HUC08'].apply(add_random_error, \
-                            json_dict=summer_cl_dict, i=i, var=1)
+                # can use ProcessPoolExecutor because we are reading and writing different files in each core
+                with concurrent.futures.ProcessPoolExecutor(
+                    max_workers=7
+                ) as executor:
+                    executor.map(param_wrapper, params)
 
-                        data_fl.loc[data_fl['SEASON'] == 'Fall','PRECIP'] += data_fl[data_fl['SEASON'] == 'Fall']['HUC08'].apply(add_random_error, \
-                            json_dict=fall_cl_dict, i=i, var=0)
-                        data_fl.loc[data_fl['SEASON'] == 'Fall','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Fall']['HUC08'].apply(add_random_error, \
-                            json_dict=fall_cl_dict, i=i, var=1)
-
-                        data_fl.loc[data_fl['SEASON'] == 'Winter','PRECIP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
-                            json_dict=winter_cl_dict, i=i, var=0)
-                        data_fl.loc[data_fl['SEASON'] == 'Winter','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
-                            json_dict=winter_cl_dict, i=i, var=1)
-
-                        # normalize climate data
-                        data_fl.loc[data_fl['SEASON'] == 'Spring',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','PRECIP']], \
-                            szn='SPRING', var='PRECIP', gcm=gcm, scn=scn)
-                        data_fl.loc[data_fl['SEASON'] == 'Spring',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','MAX_TMP']], \
-                            szn='SPRING', var='MAX_TEMP', gcm=gcm, scn=scn)
-
-                        data_fl.loc[data_fl['SEASON'] == 'Summer',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Summer',['HUC08','PRECIP']], \
-                            szn='SUMMER', var='PRECIP', gcm=gcm, scn=scn)
-                        data_fl.loc[data_fl['SEASON'] == 'Summer',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Summer',['HUC08','MAX_TMP']], \
-                            szn='SUMMER', var='MAX_TEMP', gcm=gcm, scn=scn)
-
-                        data_fl.loc[data_fl['SEASON'] == 'Fall',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Fall',['HUC08','PRECIP']], \
-                            szn='FALL', var='PRECIP', gcm=gcm, scn=scn)
-                        data_fl.loc[data_fl['SEASON'] == 'Fall',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Fall',['HUC08','MAX_TMP']], \
-                            szn='FALL', var='MAX_TEMP', gcm=gcm, scn=scn)
-
-                        data_fl.loc[data_fl['SEASON'] == 'Winter',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Winter',['HUC08','PRECIP']], \
-                            szn='WINTER', var='PRECIP', gcm=gcm, scn=scn)
-                        data_fl.loc[data_fl['SEASON'] == 'Winter',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Winter',['HUC08','MAX_TMP']], \
-                            szn='WINTER', var='MAX_TEMP', gcm=gcm, scn=scn)
-
-                        # add random variace for lclu data
-                        data_fl['PR_AG'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=0)
-                        data_fl['PR_INT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=1)
-                        data_fl['PR_NAT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=2)
-
-
-                        # Set up MERF model
-                        data_fl['HUC_SEASON'] = data_fl['HUC08'].astype('str') + '_' + data_fl['SEASON']
-
-                        X_future = data_fl[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
-                        Z_future = np.ones((len(X_future), 1))
-                        clusters_future = data_fl['HUC_SEASON']
-                        # Run MERF model
-                        y_hat_test = merf_model.predict(X_future, Z_future, clusters_future)
-                        data_fl['PRED_LOG_WATER'] = y_hat_test
-                        # Save file
-                        data_fl.to_csv(outpath)
                 print(f'{gcm}_{scn}_{foresce} done')
 
 if __name__ == '__main__':

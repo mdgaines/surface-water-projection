@@ -241,6 +241,7 @@ def process(fldr):
             del(huc8_reproj)
             huc8_df = pd.DataFrame(huc8['huc8'])
             huc8_df['total_water'] = 0
+            huc8_df['total_pixels'] = 0
 
 
         else:
@@ -257,7 +258,7 @@ def process(fldr):
         # water_array = water_arr.mask * 1
         # water_array = water_array.astype('uint8')
 
-        zs = zonal_stats(huc8, water_array, affine=affine, stats=['sum'], nodata=0, all_touched = False)
+        zs = zonal_stats(huc8, water_array, affine=affine, stats=['sum', 'count'], nodata=0, all_touched = False)
 
         del(water_array)
 
@@ -265,6 +266,7 @@ def process(fldr):
         zs_df = zs_df.fillna(0)
 
         huc8_df['total_water'] += zs_df['sum']
+        huc8_df['total_pixels'] += zs_df['count']
         # print(szn, os.path.basename(tif_paths[i]), 'completed')
         # print(huc8_df.head())
 
