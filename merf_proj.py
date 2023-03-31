@@ -44,9 +44,9 @@ def _get_Z_matrix(Z_values=np.array, Z_vars=list):
 
 def get_merf_model(train, Z_vars:list=['SEASON', 'HUC04'], clusters:str='HUC08'):
     
-    rf_fe_b = RandomForestRegressor(n_estimators = 1000, random_state = 42)
+    rf_fe_b = RandomForestRegressor(n_estimators = 100, random_state = 42)
 
-    mrf = MERF(rf_fe_b, max_iterations=10)
+    mrf = MERF(rf_fe_b, max_iterations=3)
     X_train = train[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
     clusters_train = train[clusters]
     y_train = train['LOG_PR_WATER']
@@ -240,8 +240,8 @@ def process(data_fl,
         Processes each Monte Carlo run and saves the output file
     '''
 
-    i = outpath.split('_')[-1].split('.')[0]
-
+    i = int(outpath.split('_')[-1].split('.')[0])
+    print(i)
     # Add random variance to climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring','PRECIP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
         json_dict=spring_cl_dict, i=i, var=0)
@@ -262,6 +262,8 @@ def process(data_fl,
         json_dict=winter_cl_dict, i=i, var=0)
     data_fl.loc[data_fl['SEASON'] == 'Winter','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
         json_dict=winter_cl_dict, i=i, var=1)
+
+    print(data_fl.head())
 
     # normalize climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','PRECIP']], \
@@ -298,7 +300,12 @@ def process(data_fl,
     # Save file
     data_fl.to_csv(outpath)
 
-    return
+    if os.path.exists(outpath):
+        print(f'{os.path.basename(outpath)} written')
+    else:
+        print('got through processing but did not save')
+
+    return()
 
 
 def param_wrapper(p):
@@ -307,16 +314,16 @@ def param_wrapper(p):
 
 def main():
 
-    GCM_LST = ['GFDL', 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
-    SCENARIO_LST = ['RCP45', 'RCP85']
-    FORESCE_LST = ['A1B', 'A2', 'B1', 'B2']
+    GCM_LST = ['GFDL']#, 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
+    SCENARIO_LST = ['RCP45']#, 'RCP85']
+    FORESCE_LST = ['A1B']#, 'A2', 'B1', 'B2']
     # SEASON_LST = ['SPRING', 'SUMMER', 'FALL', 'WINTER']
 
     train, test, dswe = get_dswe_split(test_split=0.2)
 
     merf_model = get_merf_model(train=train, Z_vars=['SEASON'], clusters='HUC08')
 
-    mse_test, rmspe_test, mpe_test, r2_test = get_merf_error_stats(merf_model, test, Z_varss=['SEASON'], clusters='HUC08')
+    mse_test, rmspe_test, mpe_test, r2_test = get_merf_error_stats(merf_model, test, Z_vars=['SEASON'], clusters='HUC08')
 
     print('MSE:', mse_test)
     print('RMSPE:', rmspe_test)
@@ -339,7 +346,7 @@ def main():
 
                 to_proc_outpath_lst = []
 
-                for i in range(10):
+                for i in range(3):
                     outpath = f'../data/FutureData/GCM_FORESCE_CSVs/{gcm}/{gcm}_{scn}_{foresce}/{gcm}_{scn}_{foresce}_{i}.csv'
 
                     if not os.path.exists(outpath):
@@ -349,15 +356,25 @@ def main():
                         to_proc_outpath_lst.append(outpath)
 
                 # Add random variance to climate data
-                params = ((data_fl, outpath, merf_model, dswe, \
+                params = ((data_fl, path, merf_model, dswe, \
                            spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
-                           lclu_dict, gcm, scn) for t in to_proc_outpath_lst)
+                           lclu_dict, gcm, scn) for path in to_proc_outpath_lst)
+                # params = [(data_fl, path, merf_model, dswe, \
+                #         spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
+                #         lclu_dict, gcm, scn) for path in to_proc_outpath_lst]
 
-                # can use ProcessPoolExecutor because we are reading and writing different files in each core
+                # # can use ProcessPoolExecutor because we are reading and writing different files in each core
                 with concurrent.futures.ProcessPoolExecutor(
                     max_workers=7
                 ) as executor:
                     executor.map(param_wrapper, params)
+
+                #     t = [executor.submit(process, data_fl, path, merf_model, dswe, \
+                #            spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
+                #            lclu_dict, gcm, scn) for path in to_proc_outpath_lst]
+
+                # with multiprocessing.Pool(4) as pool:
+                #     pool.map(param_wrapper, params)
 
                 print(f'{gcm}_{scn}_{foresce} done')
 
