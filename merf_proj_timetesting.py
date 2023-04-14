@@ -57,7 +57,7 @@ def get_merf_model(train, Z_vars:list=['SEASON', 'HUC04'], clusters:str='HUC08')
     
     rf_fe_b = RandomForestRegressor(n_estimators = 1000, random_state = 42)
 
-    mrf = MERF(rf_fe_b, max_iterations=200)
+    mrf = MERF(rf_fe_b, max_iterations=20, gll_early_stop_threshold=0.0001)
     X_train = train[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
     clusters_train = train[clusters]
     y_train = train['LOG_PR_WATER']
@@ -268,6 +268,8 @@ def process(data_fl,
 
     i = int(outpath.split('_')[-1].split('.')[0])
 
+    start_time_climate_rand = time.time()
+
     # Add random variance to climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring','PRECIP'] += data_fl[data_fl['SEASON'] == 'Spring']['HUC08'].apply(add_random_error, \
         json_dict=spring_cl_dict, i=i, var=0)
@@ -288,6 +290,11 @@ def process(data_fl,
         json_dict=winter_cl_dict, i=i, var=0)
     data_fl.loc[data_fl['SEASON'] == 'Winter','MAX_TMP'] += data_fl[data_fl['SEASON'] == 'Winter']['HUC08'].apply(add_random_error, \
         json_dict=winter_cl_dict, i=i, var=1)
+    
+    end_time_climate_rand = time.time()
+    print_time(start_time_climate_rand, end_time_climate_rand, 'climate add rand')
+    
+    start_time_climate_norm = time.time()
 
     # normalize climate data
     data_fl.loc[data_fl['SEASON'] == 'Spring',['PRECIP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Spring',['HUC08','PRECIP']], \
@@ -310,19 +317,43 @@ def process(data_fl,
     data_fl.loc[data_fl['SEASON'] == 'Winter',['MAX_TMP']] = normalize_climate_vars(data_fl.loc[data_fl['SEASON'] == 'Winter',['HUC08','MAX_TMP']], \
         szn='WINTER', var='MAX_TEMP')
 
+    end_time_climate_norm = time.time()
+    print_time(start_time_climate_norm, end_time_climate_norm, 'climate normalize')
+
+    start_time_lclu_rand = time.time()
+
     # add random variace for lclu data
     data_fl['PR_AG'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=0)
     data_fl['PR_INT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=1)
     data_fl['PR_NAT'] += data_fl['HUC08'].apply(add_random_error, json_dict=lclu_dict, i=i, var=2)
 
+    end_time_lclu_rand = time.time()
+    print_time(start_time_lclu_rand, end_time_lclu_rand, 'lclu add rand')
+    
+    start_time_merf_setup = time.time()
+
     # Set up MERF model
     X_future, Z_future, clusters_future = setup_merf_future(data_fl, Z_vars=['SEASON'], clusters='HUC08', obs_data=dswe)
     
+    end_time_merf_setup = time.time()
+    print_time(start_time_merf_setup, end_time_merf_setup, 'merf setup')
+
+    start_time_merf_pred = time.time()
+    
     # Run MERF model
     y_hat_test = merf_model.predict(X_future, Z_future, clusters_future)
+
+    end_time_merf_pred = time.time()
+    print_time(start_time_merf_pred, end_time_merf_pred, 'merf.predict')
+
+    start_time_tocsv = time.time()
+
     data_fl['PRED_LOG_WATER'] = y_hat_test
     # Save file
     data_fl.to_csv(outpath)
+
+    end_time_tocsv = time.time()
+    print_time(start_time_tocsv, end_time_tocsv, 'save .to_csv()')
 
     return()
 
@@ -367,8 +398,8 @@ def main():
 
                 to_proc_outpath_lst = []
 
-                for i in range(1000):
-                    outpath = f'../data/FutureData/GCM_FORESCE_CSVs/{gcm}/{gcm}_{scn}_{foresce}/{gcm}_{scn}_{foresce}_{i}.csv'
+                for i in range(10):
+                    outpath = f'../data/FutureData/GCM_FORESCE_CSVs/timetest/{gcm}/{gcm}_{scn}_{foresce}/{gcm}_{scn}_{foresce}_{i}.csv'
 
                     if not os.path.exists(outpath):
                         if not os.path.exists(os.path.dirname(outpath)):
@@ -381,11 +412,16 @@ def main():
                            spring_cl_dict, summer_cl_dict, fall_cl_dict, winter_cl_dict, \
                            lclu_dict) for path in to_proc_outpath_lst)
 
+                start_time_concFutures = time.time()
+
                 # # can use ProcessPoolExecutor because we are reading and writing different files in each core
                 with concurrent.futures.ProcessPoolExecutor(
                     max_workers=7
-                ) as executor:
+                ) as executor: 
                     executor.map(param_wrapper, params)
+
+                end_time_concFutures = time.time()
+                print_time(start_time_concFutures, end_time_concFutures)
 
                 end_time_scenario = time.time()
                 print_time(start_time_scenario, end_time_scenario)
