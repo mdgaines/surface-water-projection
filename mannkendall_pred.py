@@ -28,7 +28,8 @@ def clean_df(df, huc=False, pred=True):
 
 
 scn_ci_dict = {}
-scn_lst = ['RCP45_B1', 'RCP85_B2', 'RCP85_A2']
+scn_lst = ['RCP45_B1', 'RCP85_B2', 'RCP85_A2', \
+           'RCP85_B1', 'RCP45_B2', 'RCP45_A2', 'RCP45_A1B', 'RCP85_A1B']
 for scn in scn_lst:
     multi_output_ci = f'../data/FutureData/GCM_FORESCE_CSVs/HUC_CI/MULTIMODEL_{scn}_MC_HUC_CI95.csv'
     ci_df = pd.read_csv(multi_output_ci, index_col=0)

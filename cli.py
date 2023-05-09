@@ -24,7 +24,7 @@ def parse_write_download_cmd():
 
 def parse_clip_nc():
     '''
-        Parse the command-line arguments for .py for climate_data_processing.py
+        Parse the command-line arguments for climate_data_processing.py
     '''
     parser = argparse.ArgumentParser(description='Clips climate NC files to study area, can calculate seasonal averages.')
 
@@ -48,3 +48,38 @@ def parse_clip_nc():
 
     return(parser.parse_args())
 
+
+def parse_get_huc_scn_info():
+    '''
+        Parse the command-line arguments for get_huc_scn_info.py
+    '''
+
+    parser = argparse.ArgumentParser(description='Gets mean, 95\% CI, and Mann-Kendall trend and p-value for\
+                                     a specified HUC and scenario.')
+    
+    parser.add_argument('-scn', '--scenario', type=str,
+                        default='all',
+                        help='RCP-SRES scenarios\
+                            \n(options (str): all, \
+                            \n\tRCP45_A1B, RCP45_A2, RCP45_B1, RCP45_B2, \
+                            \n\tRCP85_A1B, RCP85_A2, RCP85_B1, RCP85_B2)')
+
+    parser.add_argument('-huc', '--huc_lst', type=list,
+                        default=[3130001, 3020201, 3100205, 6010201, 8090203],
+                        help='List of HUC08s of interest')
+
+    parser.add_argument('-vars', '--variables', type=list,
+                        default=['MEAN', 'CI', 'TREND', 'P_VALUE'],
+                        help='Variables of interest')
+
+    parser.add_argument('-yr', '--years', type=str,
+                        default='all',
+                        help='Years for which to get the variable information\
+                            \n(options (str): 2040, 2070, 2099, all)')
+    
+    parser.add_argument('-szn', '--season', type=str,
+                        default='spring',
+                        help='Season for which to get the variable information\
+                            \n(options (str): Spring, Summer, Fall, Winter)')
+    
+    return(parser.parse_args())
