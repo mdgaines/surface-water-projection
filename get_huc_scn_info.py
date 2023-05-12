@@ -111,7 +111,7 @@ def print_yr_szn_mean_ci(season:str, df:pd.DataFrame, year:str, mk_dict:dict, mk
                     print(f'\t{mk_df[col].values[0]}', end=" ")
                 else:
                     col = var
-                    print(f'\t{round(mk_df[col].values[0], 6)}', end=" ")
+                    print(f'\t{round(mk_df[col].values[0], 6)}\t', end=" ")
 
             print()
 

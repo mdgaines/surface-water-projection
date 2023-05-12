@@ -64,11 +64,11 @@ def parse_get_huc_scn_info():
                             \n\tRCP45_A1B, RCP45_A2, RCP45_B1, RCP45_B2, \
                             \n\tRCP85_A1B, RCP85_A2, RCP85_B1, RCP85_B2)')
 
-    parser.add_argument('-huc', '--huc_lst', type=list,
+    parser.add_argument('-huc', '--huc_lst', nargs="*", type=int,
                         default=[3130001, 3020201, 3100205, 6010201, 8090203],
                         help='List of HUC08s of interest')
 
-    parser.add_argument('-vars', '--variables', type=list,
+    parser.add_argument('-vars', '--variables', nargs="*", type=str,
                         default=['MEAN', 'CI', 'TREND', 'P_VALUE'],
                         help='Variables of interest')
 

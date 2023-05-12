@@ -148,10 +148,9 @@ def main():
     foresce_lst = ['A1B', 'A2', 'B1', 'B2']
     gcm_lst = ['GFDL', 'HadGEM2', 'IPSL', 'MIROC5', 'NorESM1']
 
-
+    full_MC_ci_info_dict = {}
     for rcp in rcp_lst:
         for foresce in foresce_lst:
-            full_MC_ci_info_dict = {}
 
             for gcm in gcm_lst:
 
@@ -220,3 +219,59 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+# new fig of study area gcms
+fig = plt.figure(figsize=(15, 18))
+gs = fig.add_gridspec(4,2, hspace=.1, wspace=.03)
+((ax1, ax2), (ax3, ax4), (ax5, ax6), (ax7, ax8)) = gs.subplots()
+for rcp in rcp_lst:
+    for foresce in foresce_lst:
+        if rcp == 'RCP45' and foresce == 'B1':
+            ax = ax1
+        elif rcp == 'RCP85' and foresce == 'B1':
+            ax = ax2
+        elif rcp == 'RCP45' and foresce == 'B2':
+            ax = ax3
+        elif rcp == 'RCP85' and foresce == 'B2':
+            ax = ax4
+        elif rcp == 'RCP45' and foresce == 'A1B':
+            ax = ax5
+        elif rcp == 'RCP85' and foresce == 'A1B':
+            ax = ax6
+        elif rcp == 'RCP45' and foresce == 'A2':
+            ax = ax7
+        elif rcp == 'RCP85' and foresce == 'A2':
+            ax = ax8
+        
+        for gcm in gcm_lst:
+
+            CI_df = full_MC_ci_info_dict[f'{gcm}_{rcp}_{foresce}']
+            x = [i for i in range(375)]
+            ax.plot(np.asarray(CI_df['MEAN']),linewidth=2, alpha=0.5, label=gcm)
+            ax.fill_between(x, CI_df['LOWER_95_CI'], CI_df['UPPER_95_CI'],  alpha=.3, label='95% CI')
+    
+# # reordering the labels
+# handles, labels = plt.gca().get_legend_handles_labels()
+
+# # specify order
+# order = [0, 2, 4, 6, 8, 1]
+
+# # pass handle & labels lists along with order as below
+# ax1.legend([handles[i] for i in order], [labels[i] for i in order])
+# plt.show()
+for ax in fig.get_axes():
+
+    ax.set_xticks([0,16,36,56,76,96,116,136,156,176,196,216,236,256,276,296,316,336,356,375 ], minor=False)
+    ax.set_xticklabels(['','2010','','2020','','2030','','2040','','2050','','2060','','2070','','2080','','2090','','2099'], size = 16)
+
+    ax.xaxis.grid(True, which='major', linestyle = (0, (5, 10)))
+    ax.yaxis.grid(True, which='major', linestyle = (0, (5, 10)))
+    ax.set_ylabel('Surface Water Area',size=20)
+    ax.set_ylim([87000, 142000])
+    ax.set_xlabel('Year', size=20)
+
+    ax.label_outer()
+
+    # ax.set_title(f'{key.split("_")[-2]} - {key.split("_")[-1]}', size=20)
