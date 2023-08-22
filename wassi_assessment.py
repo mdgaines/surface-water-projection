@@ -8,6 +8,7 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from matplotlib.patches import Patch
 import geopandas as gpd
 
 plt.rcParams['font.family'] = 'Times New Roman'
@@ -139,14 +140,15 @@ def calc_multimodel_wassi(wassi_dict:dict, yr:str):
     return
 
 
-def print_quantiles(yr_shp, yr, scn, rcp, model):
+def print_quantiles(yr_shp, yr, scn, rcp, model, col_val=''):
         
-        if model == 'WASSI':
-            # col_val = 'DIFF_SWS_km2'
-            col_val = 'DIFF'
+        if col_val == '':
+            if model == 'WASSI':
+                # col_val = 'DIFF_SWS_km2'
+                col_val = 'DIFF'
 
-        elif model == 'MERF':
-            col_val = 'DIFF'
+            elif model == 'MERF':
+                col_val = 'DIFF'
 
         print(f"\n{model} {yr} {scn}-{rcp}\n")
         print(f"\tmin: {yr_shp[col_val].min()}\n\
@@ -161,80 +163,100 @@ def print_quantiles(yr_shp, yr, scn, rcp, model):
         median: {yr_shp[col_val].median()}")
 
 
-def _set_colors(df):
-    conditions = [
-        (df['SWS_km2'] <= 0.2),
-        (df['SWS_km2'] > 0.2) & (df['SWS_km2'] <= 0.4),
-        (df['SWS_km2'] > 0.4) & (df['SWS_km2'] <= 0.6),
-        (df['SWS_km2'] > 0.6) & (df['SWS_km2'] <= 0.8),
-        (df['SWS_km2'] > 0.8) & (df['SWS_km2'] <= 1.0),
-        (df['SWS_km2'] > 1.0) & (df['SWS_km2'] <= 5.0),
-        (df['SWS_km2'] > 5.0) & (df['SWS_km2'] <= 10.0),
-        (df['SWS_km2'] > 10.0) & (df['SWS_km2'] <= 1310)
-    ]
-
-    colors = ['#edf8fb','#cce0ee','#aec5df','#97a6cf','#8b84bd','#895fac','#853795', '#4b0f49']
-
-    df['colors'] = np.select(conditions, colors)
-
-    return(df, colors)
-
 def plot_sws_maps(yr_shp, scn, yr, model):
 
     if model == 'WASSI':
-        outpath = f"../imgs/Paper2/Results/sws_diff_maps/MULTIMODEL_{scn}_{yr}_DIFF_SWS_KM2.png"
-        bounds = [-2000, -700, -400, -200, 0, 200, 400, 700, 2000] # for raw diffs
-        col_name = 'DIFF'
+        # outpath = f"../imgs/Paper2/Results/sws_diff_maps/MULTIMODEL_{scn}_{yr}_DIFF_SWS_KM2.png"
+        outpath = f"../imgs/Paper2/Results/sws_diff_maps/MULTIMODEL_{scn}_{yr}_PER-DIFF_SWS.png"
+        # bounds = [-2000, -700, -400, -200, 0, 200, 400, 700, 2000] # for raw diffs
+        # col_name = 'DIFF'
+        col_name = 'PER_DIFF'
+        bounds = [-1, -.50, -.25, -.1, 0, .1, .25, .5, 1]
         # bounds = [-0.6, -0.2, -0.1, -0.05, 0, 0.05, 0.1, 0.2, 0.6] # for diffs per km2
         # col_name = 'DIFF_SWS_km2'
         label = "Change in Surface Water Supply (millions gallons per day) from 2011"
     elif model == 'MERF':
-        outpath = f"../imgs/Paper2/Results/projswa_diff_maps/MULTIMODEL_{scn}_{yr}_DIFF_projSWA_KM2.png"
-        bounds = [-0.1, -0.02, -0.01, -0.005, 0, 0.005, 0.01, 0.02, 0.1]
-        col_name = 'DIFF'
+        # outpath = f"../imgs/Paper2/Results/projswa_diff_maps/MULTIMODEL_{scn}_{yr}_DIFF_projSWA_KM2.png"
+        outpath = f"../imgs/Paper2/Results/projswa_diff_maps/MULTIMODEL_{scn}_{yr}_PER-DIFF_projSWA_KM2.png"
+        # bounds = [-0.1, -0.02, -0.01, -0.005, 0, 0.005, 0.01, 0.02, 0.1]
+        # col_name = 'DIFF'
+        col_name = 'PER_DIFF'
+        bounds = [-1, -.50, -.25, -.1, 0, .25, .75, 1, 3]
         label = "Change in Surface Water Area (per km2) from 2011"
+
+    elif model == 'merged':
+        outpath = f"../imgs/Paper2/Results/agree_diff_maps/MULTIMODEL_{scn}_{yr}_WaSSI-MERF-AGREE.png"
+        col_name = 'AGREEMENT'
+
+        label = 'Agreement of WaSSI and MERF projection models'
 
     if os.path.exists(outpath):
         print(f"{os.path.basename(outpath)} exists.")
         return
     
-    # yr_shp, colors = _set_colors(yr_shp)
 
-    # bounds = [0.2, 0.4, 0.6, 0.8, 1, 5, 10]
-    # bounds = [0.005, 0.01, 0.02, 0.03, 0.1, 0.3, 0.5]
-    # colors = ['#edf8fb','#cce0ee','#aec5df','#97a6cf','#8b84bd','#895fac','#853795', '#4b0f49']
 
-    # colors = ['#3a1800', '#623408', '#8b5312', '#b37626', '#d49e51', '#edc88d', '#97d9d0', '#5eb4ab', '#308e86', '#196860', '#06443c', '#002319']
-
-    colors = ['#3a1800', '#6a3a0a', '#9b6119', '#c88d3c', '#e9c080', '#8bd2c9', '#49a59d', '#21776f', '#084b43', '#002319']
-
-    # colors = ['#edf8fb','#bfd3e6','#9ebcda','#8c96c6','#8c6bb1','#88419d','#6e016b']
-
-    # if scn == 'RCP45_B1':
-    # colors = ['#8d5b29', '#a8908d', '#d1c6c6', '#ffffef', '#aec6ab', '#608f6c', '#005a32']
-    # elif scn == 'RCP85_B2':
-    #     colors = ['#8d5b29', '#a8908d', '#d1c6c6', '#ffffef', '#b9bcd1',  '#717db3', '#084594']
-    # elif scn == 'RCP85_A2':
-    #     colors = ['#8d5b29', '#a8908d', '#d1c6c6', '#ffffef', '#e0b2b0', '#bc6675', '#91003f']
-                  
-    # cmap = matplotlib.colors.ListedColormap(colors)
-    # cmap = 'BuPu'
-    cmap=matplotlib.colors.ListedColormap(colors)
-    norm = matplotlib.colors.BoundaryNorm(bounds, len(colors), extend='both')
-    # norm = matplotlib.colors.LogNorm(0., 1300)
-
-    fig, ax = plt.subplots(figsize=(20, 12))#, facecolor = "#C0C0C0")
-    # ax.set_facecolor("#C0C0C0")
+    fig, ax = plt.subplots(figsize=(20, 12))
+    
     plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
     ax.set_aspect('equal')
     ax.set_axis_off()
 
-    yr_shp.plot(column=yr_shp[col_name], ax=ax, edgecolor='black', linewidth=0.5, legend=True,
-                cmap=cmap, norm=norm, 
-                legend_kwds={"label": label,
-                             "orientation": "horizontal", 
-                             "shrink": 0.5, "pad":0.0, 
-                             "extendfrac": 'auto'})#, "fontsize": 20})
+    if model == 'merged':
+        agreement_palette = {'Positive':'#54adee', 
+                             'Negative':'#ffa5b6', 
+                             'Disagree':'#ffffef'} 
+        
+        legend_elements = [Patch(facecolor=agreement_palette['Positive'], 
+                                 edgecolor='black', linewidth=0.5,
+                                 label='Increase'),
+                           Patch(facecolor=agreement_palette['Negative'], 
+                                 edgecolor='black', linewidth=0.5,
+                                 label='Decrease'),
+                           Patch(facecolor=agreement_palette['Disagree'], 
+                                 edgecolor='black', linewidth=0.5,
+                                 label='Disagree')]
+
+        agreement_dict = {}
+        for ctype, data in yr_shp.groupby('AGREEMENT'):
+            print(ctype)
+            # print(data)
+            # label=ctype
+            agreement_dict[ctype + '_03'] = merged_df.loc[(merged_df['HUC02']=='03') & (merged_df['AGREEMENT'] == ctype)].count()['HUC02']
+            agreement_dict[ctype + '_06'] = merged_df.loc[(merged_df['HUC02']=='06') & (merged_df['AGREEMENT'] == ctype)].count()['HUC02']
+            agreement_dict[ctype + '_08'] = merged_df.loc[(merged_df['HUC02']=='08') & (merged_df['AGREEMENT'] == ctype)].count()['HUC02']
+
+            color = agreement_palette[ctype]
+            data.plot(color=color, ax=ax, edgecolor='black', linewidth=0.5)
+        
+        row_labels = ['Increasing', 'Decreasing', 'Disagree']
+        col_labels = ['South Atlantic Gulf', ' Tennessee', 'Lower Mississippi']
+        table_vals = [[agreement_dict['Positive_03'], agreement_dict['Positive_06'], agreement_dict['Positive_08']],
+                      [agreement_dict['Negative_03'], agreement_dict['Negative_06'], agreement_dict['Negative_08']],
+                      [agreement_dict['Disagree_03'], agreement_dict['Disagree_06'], agreement_dict['Disagree_08']]]
+        info_table = plt.table(bbox=[.1, .02, .49, .25],
+                               cellText=table_vals, 
+                               cellLoc='center',
+                               rowLabels=row_labels, 
+                               colLabels=col_labels, 
+                               rowColours=['#54adee', '#ffa5b6','#ffffef'])
+        plt.text(-92.5, 28, 
+                 'WaSSI and MERF Projection HUC08 Agreement Counts\nper Water Resource Region',
+                 multialignment='center')
+        # ax.legend(handles=legend_elements, loc=[.8,.1], title = 'WaSSI and MERF Projection Agreement', prop={'size':24})
+
+    else:
+        colors = ['#3a1800', '#6a3a0a', '#9b6119', '#c88d3c', '#e9c080', '#8bd2c9', '#49a59d', '#21776f', '#084b43', '#002319']
+
+        cmap=matplotlib.colors.ListedColormap(colors)
+        norm = matplotlib.colors.BoundaryNorm(bounds, len(colors), extend='both')
+
+        yr_shp.plot(column=yr_shp[col_name], ax=ax, edgecolor='black', linewidth=0.5, legend=True,
+                    cmap=cmap, norm=norm, 
+                    legend_kwds={"label": label,
+                                "orientation": "horizontal", 
+                                "shrink": 0.5, "pad":0.0, 
+                                "extendfrac": 'auto'})
 
 
     HUC02.plot(ax=ax, edgecolor='black', facecolor='none', linewidth=3)
@@ -260,11 +282,13 @@ shp = gpd.read_file('../data/Shapefiles/HUC08/HUC08_wassiweb_paper2/HUC08_wassiw
 shp = shp[['HUC8','SQ_MILES', 'geometry']]
 shp = shp.rename({'HUC8':'HUC08'}, axis='columns')
 shp['SQ_KM'] = shp['SQ_MILES'] / 0.3861 # sq mi to sq km conversion
+shp['HUC02'] = shp['HUC08'].apply(lambda x: str(x)[0].zfill(2))
 
 shp2 = gpd.read_file('../data/Shapefiles/HUC08/HUC08_paper2/HUC08_paper2.shp')
 shp2 = shp2[['huc8','areasqkm', 'geometry']]
 shp2['HUC08'] = shp2['huc8'].apply(lambda x : int(x))
 shp2['AREA'] = shp2['areasqkm'].apply(lambda x : float(x))
+shp2['HUC02'] = shp2['HUC08'].apply(lambda x: str(x)[0].zfill(2))
 
 # import WASSI and MERF ESTIMATED 2011 VALUES
 wassi_2011_obs = pd.read_csv('../data/WASSI/SEASONAL_2011_OBS.csv', index_col=0)
@@ -299,52 +323,47 @@ for scn, rcp in scn_rcp_lst:
         spring_wassi_df = pd.read_csv(inpath_wassi, index_col=0)
         spring_wassi_df = spring_wassi_df.merge(wassi_2011_SPRING_obs[['HUC08','SWS_MGD_2011']], on='HUC08')
         spring_wassi_df['DIFF'] = spring_wassi_df['SWS_MGD_MULTIMEAN'] - spring_wassi_df['SWS_MGD_2011']
+        spring_wassi_df['PER_DIFF'] = (spring_wassi_df['SWS_MGD_MULTIMEAN'] - spring_wassi_df['SWS_MGD_2011']) / spring_wassi_df['SWS_MGD_2011']
         
-        # yr_shp = shp.merge(spring_df[["HUC08", "SWS_MGD_MULTIMEAN"]], on="HUC08")
         # yr_shp['SWS_km2'] = yr_shp['SWS_MGD_MULTIMEAN'] / yr_shp['SQ_KM']
-        yr_shp_wassi = shp.merge(spring_wassi_df[["HUC08", "DIFF"]], on="HUC08")
-        yr_shp_wassi['DIFF_SWS_km2'] = yr_shp_wassi['DIFF'] / yr_shp_wassi['SQ_KM']
+        yr_shp_wassi = shp.merge(spring_wassi_df[["HUC08", "PER_DIFF", "DIFF"]], on="HUC08")
+        # yr_shp_wassi['DIFF_SWS_km2'] = yr_shp_wassi['DIFF'] / yr_shp_wassi['SQ_KM']
+
+        yr_shp_wassi.loc[yr_shp_wassi['HUC08'] == 8080100, 'HUC08'] = 8080101
 
         spring_merf_df = merf_df.loc[merf_df['YR_SZN'] == int(yr)*100]
         spring_merf_df = spring_merf_df.merge(merf_2011_SPRING_obs[['HUC08','PRED_PR_WATER']], on='HUC08')
         spring_merf_df['DIFF'] = spring_merf_df['MEAN'] - spring_merf_df['PRED_PR_WATER']
-        yr_shp_merf = shp2.merge(spring_merf_df[["HUC08", "DIFF"]], on="HUC08")
+        spring_merf_df['PER_DIFF'] = (spring_merf_df['MEAN'] - spring_merf_df['PRED_PR_WATER']) / spring_merf_df['PRED_PR_WATER']
+        yr_shp_merf = shp2.merge(spring_merf_df[["HUC08", "PER_DIFF", "DIFF"]], on="HUC08")
 
-        print_quantiles(yr_shp_wassi, yr, scn, rcp, 'WASSI')
-        print_quantiles(yr_shp_merf, yr, scn, rcp, 'MERF')
+        merged_df = yr_shp_wassi[['HUC08', 'DIFF', 'PER_DIFF', 'HUC02', 'geometry']].merge(yr_shp_merf[['HUC08','DIFF']], on='HUC08')
+        merged_df['AGREEMENT'] = ''
+        merged_df.loc[(merged_df['DIFF_x'] > 0) & (merged_df['DIFF_y'] > 0), 'AGREEMENT'] = 'Positive'
+        merged_df.loc[(merged_df['DIFF_x'] < 0) & (merged_df['DIFF_y'] < 0), 'AGREEMENT'] = 'Negative'
+        merged_df.loc[(merged_df['AGREEMENT']==''), 'AGREEMENT'] = 'Disagree'
 
+
+        for huc02 in ['03', '06', '08']:
+            print(f'\nHUC02: {huc02}')
+            print(f'WASSI')
+            print(f"\tnum inc: {yr_shp_wassi.loc[(yr_shp_wassi['HUC02']==huc02) & (yr_shp_wassi['DIFF'] > 0)].count()['DIFF']}\
+                num total: {yr_shp_wassi.loc[(yr_shp_wassi['HUC02']==huc02)].count()['DIFF']}")
+            print(f'MERF')
+            print(f"\tnum inc: {yr_shp_merf.loc[(yr_shp_merf['HUC02']==huc02) & (yr_shp_merf['DIFF'] > 0)].count()['DIFF']}\
+                num total: {yr_shp_merf.loc[(yr_shp_merf['HUC02']==huc02)].count()['DIFF']}")
+            
+            print(f"\nBoth inc count: {merged_df.loc[(merged_df['HUC02']==huc02) & (merged_df['DIFF_x'] > 0) & (merged_df['DIFF_y'] > 0)].count()['HUC02']}")
+            print(f"Both dec count: {merged_df.loc[(merged_df['HUC02']==huc02) & (merged_df['DIFF_x'] < 0) & (merged_df['DIFF_y'] < 0)].count()['HUC02']}")
+
+
+        print_quantiles(yr_shp_wassi, yr, scn, rcp, 'WASSI', col_val = 'PER_DIFF')
+        print_quantiles(yr_shp_merf, yr, scn, rcp, 'MERF', col_val = 'PER_DIFF')
+
+        plot_sws_maps(merged_df, f"{scn}-{rcp}", yr, 'merged')
 
         plot_sws_maps(yr_shp_wassi, f"{scn}-{rcp}", yr, 'WASSI')
         plot_sws_maps(yr_shp_merf, f"{scn}-{rcp}", yr, 'MERF')
-
-
-
-
-
-#### UPDATE MAP_PLOT TO WORK FOR BOTH WASSI AND MERF
-
-
-
-for scn, rcp in scn_rcp_lst:
-    inpath = f'../data/FutureData/GCM_FORESCE_CSVs/HUC_CI/MULTIMODEL_{rcp}_{scn}_MC_HUC_CI95.csv'
-    df = pd.read_csv(inpath, index_col=0)
-    for yr in yrs_lst:
-        spring_df2 = df.loc[df['YR_SZN'] == int(yr)*100]
-        yr_shp = shp2.merge(spring_df2[["HUC08", "MEAN"]], on="HUC08")
-
-        print(f"\n{yr} {scn}-{rcp}\n")
-        print(f"min: {yr_shp['MEAN'].min()}\n\
-                10: {yr_shp['MEAN'].quantile(0.1)}\n\
-                25: {yr_shp['MEAN'].quantile(0.25)}\n\
-                45: {yr_shp['MEAN'].quantile(0.45)}\n\
-                50: {yr_shp['MEAN'].quantile(0.5)}\n\
-                55: {yr_shp['MEAN'].quantile(0.55)}\n\
-                75: {yr_shp['MEAN'].quantile(0.75)}\n\
-                90: {yr_shp['MEAN'].quantile(0.9)}\n\
-                max: {yr_shp['MEAN'].max()}\n\
-                median: {yr_shp['MEAN'].median()}")
-        
-        plot_sws_maps(yr_shp, f"{scn}-{rcp}", yr)
 
 
 
