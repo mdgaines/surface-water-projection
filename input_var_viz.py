@@ -16,7 +16,7 @@ from glob import glob
 #hello
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = "16"
+plt.rcParams["font.size"] = "20"
 
 def clean_df(df): #, huc=False, add_rand=False):
     
@@ -138,17 +138,13 @@ def save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
     
     fig, ax1 = plt.subplots(figsize=(16, 8))
 
-    ax1.plot(hist_frst_avg, linewidth = 3, alpha=0.75, color='#006723', label='Historical', linestyle=(5, (10, 3)))
-    ax1.plot(hist_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle=(5, (10, 3)))
-    ax1.plot(hist_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle=(5, (10, 3)))
+    # ax1.plot(hist_frst_avg, linewidth = 3, alpha=0.75, color='#006723', label='Historical', linestyle=(5, (10, 3)))
+    # ax1.plot(hist_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle=(5, (10, 3)))
+    # ax1.plot(hist_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle=(5, (10, 3)))
 
-    ax1.plot(A1B_frst_avg, linewidth = 3, alpha=0.75, color='#006723', linestyle = (0,(5,5)), label='A1B' )
-    ax1.plot(A1B_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = (0,(5,5)))
-    ax1.plot(A1B_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle = (0,(5,5)))
-
-    ax1.plot(A2_frst_avg, linewidth = 3, alpha=0.75, color='#006723', linestyle = (0,(5,1)), label='A2')
-    ax1.plot(A2_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = (0,(5,1)))
-    ax1.plot(A2_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle = (0,(5,1)))
+    ax1.plot(NLCD_frst_avg, linewidth = 3, alpha=1, color='#006723', label='Forest-dominated', linestyle='solid')
+    ax1.plot(NLCD_ints_avg, linewidth = 3, alpha=1, color='#b62b53', label='Intensive', linestyle='solid')
+    ax1.plot(NLCD_agri_avg, linewidth = 3, alpha=1, color='#bca447', label='Agriculture', linestyle='solid')
 
     ax1.plot(B1_frst_avg, linewidth = 3, alpha=0.75, color='#006723', linestyle = 'dashdot', label='B1' )
     ax1.plot(B1_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = 'dashdot')
@@ -158,14 +154,17 @@ def save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
     ax1.plot(B2_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = (0, (3, 1,1,1,1,1)))
     ax1.plot(B2_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle = (0, (3, 1,1,1,1,1)))
 
-    ax1.plot(NLCD_frst_avg, linewidth = 3, alpha=1, color='#006723', label='Forest-dominated', linestyle='solid')
-    ax1.plot(NLCD_ints_avg, linewidth = 3, alpha=1, color='#b62b53', label='Intensive', linestyle='solid')
-    ax1.plot(NLCD_agri_avg, linewidth = 3, alpha=1, color='#bca447', label='Agriculture', linestyle='solid')
+    ax1.plot(A1B_frst_avg, linewidth = 3, alpha=0.75, color='#006723', linestyle = (0,(5,5)), label='A1B' )
+    ax1.plot(A1B_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = (0,(5,5)))
+    ax1.plot(A1B_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle = (0,(5,5)))
 
+    ax1.plot(A2_frst_avg, linewidth = 3, alpha=0.75, color='#006723', linestyle = (0,(5,1)), label='A2')
+    ax1.plot(A2_ints_avg, linewidth = 3, alpha=0.75, color='#b62b53', linestyle = (0,(5,1)))
+    ax1.plot(A2_agri_avg, linewidth = 3, alpha=0.75, color='#bca447', linestyle = (0,(5,1)))
 
     ax1.set_title('FORE-SCE Land Cover Projections')
-    ax1.set_xlabel('Year')
-    ax1.set_ylabel('Percent Land Cover')
+    ax1.set_xlabel('Year', size=24)
+    ax1.set_ylabel('Percent Land Cover', size=24)
     ax1.set_ylim(0,75)
 
     # Make a plot with major ticks that are multiples of 10 and minor ticks that
@@ -178,7 +177,7 @@ def save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
     ax1.yaxis.set_minor_locator(MultipleLocator(5))
     ax1.yaxis.grid(True, which='major', linestyle = (0, (1, 5)))
 
-    ax1.xaxis.set_major_locator(IndexLocator(base=10, offset=-2))
+    ax1.xaxis.set_major_locator(IndexLocator(base=10, offset=-1))
     # ax1.xaxis.set_major_formatter('{x:.0f}')
     # For the minor ticks, use no labels; default NullFormatter.
     ax1.xaxis.set_minor_locator(MultipleLocator(1))
@@ -187,21 +186,27 @@ def save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
     # reordering the labels
     handles, labels = plt.gca().get_legend_handles_labels()
 
-    hist = mlines.Line2D([], [], color='black', linewidth=3, ls=(5, (10, 3)), label='Historical')
+    # hist = mlines.Line2D([], [], color='black', linewidth=3, ls=(5, (10, 3)), label='Historical')
     a1b = mlines.Line2D([], [], color='black', linewidth=3, ls=(0,(5,5)), label='A1B')
     a2 = mlines.Line2D([], [], color='black', linewidth=3, ls=(0,(5,1)), label='A2')
     b1 = mlines.Line2D([], [], color='black', linewidth=3, ls='dashdot', label='B1')
     b2 = mlines.Line2D([], [], color='black', linewidth=3, ls=(0, (3, 1,1,1,1,1)), label='B2')
-    handles[0] = hist
-    handles[1] = a1b
-    handles[2] = a2
+    # handles[0] = hist
+    handles[5] = a1b
+    handles[6] = a2
     handles[3] = b1
     handles[4] = b2
 
     # specify order
-    order = [5, 6, 7, 0, 1, 2, 3, 4]
+    order = [0, 1, 2, 3, 4, 5, 6]
     # pass handle & labels lists along with order as below
     ax1.legend([handles[i] for i in order], [labels[i] for i in order])
+
+    ax1.text(2101, 70.7, 'B2')
+    ax1.text(2101, 66.5, 'B1')
+    ax1.text(2100, 53.8, 'A1B')
+    ax1.text(2101, 48, 'A2')
+
 
     fig.savefig('../imgs/Paper2/var_projections/FORE-SCE.png', dpi=300,\
         facecolor='w', edgecolor='w', transparent=False, pad_inches=0)
@@ -304,6 +309,14 @@ hist_frst_avg, hist_ints_avg, hist_agri_avg,\
     B1_frst_avg, B1_ints_avg, B1_agri_avg,\
     B2_frst_avg, B2_ints_avg, B2_agri_avg = import_foresce_data()
 
+for df in [hist_frst_avg, hist_ints_avg, hist_agri_avg,\
+        NLCD_frst_avg, NLCD_ints_avg, NLCD_agri_avg,\
+        A1B_frst_avg, A1B_ints_avg, A1B_agri_avg,\
+        A2_frst_avg, A2_ints_avg, A2_agri_avg,\
+        B1_frst_avg, B1_ints_avg, B1_agri_avg,\
+        B2_frst_avg, B2_ints_avg, B2_agri_avg]:
+    df.index = df.index.astype('int')
+
 save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
             NLCD_frst_avg, NLCD_ints_avg, NLCD_agri_avg,\
             A1B_frst_avg, A1B_ints_avg, A1B_agri_avg,\
@@ -318,6 +331,34 @@ save_foresce_png(hist_frst_avg, hist_ints_avg, hist_agri_avg,\
 # repeat for WRRs
 
 # assess Mann-Kendall across full study area avgs and WRRs (can do by HUC 4 or 8 later if needed)
+import pymannkendall as mk
+
+
+df_lst = [NLCD_frst_avg, NLCD_ints_avg, NLCD_agri_avg,\
+            A1B_frst_avg, A1B_ints_avg, A1B_agri_avg,\
+            A2_frst_avg, A2_ints_avg, A2_agri_avg,\
+            B1_frst_avg, B1_ints_avg, B1_agri_avg,\
+            B2_frst_avg, B2_ints_avg, B2_agri_avg]
+df_names = ['NLCD_frst_avg', 'NLCD_ints_avg', 'NLCD_agri_avg',\
+            'A1B_frst_avg', 'A1B_ints_avg', 'A1B_agri_avg',\
+            'A2_frst_avg', 'A2_ints_avg', 'A2_agri_avg',\
+            'B1_frst_avg', 'B1_ints_avg', 'B1_agri_avg',\
+            'B2_frst_avg', 'B2_ints_avg', 'B2_agri_avg']
+for i in range(len(df_lst)):
+    print(df_names[i])
+    df = df_lst[i]
+    res_all = mk.original_test(df)
+    print(f'\tALL: {res_all.trend}, {res_all.p}, {res_all.slope}')
+
+    if 'NLCD' in df_names[i]:
+        continue
+    res_40 = mk.original_test(df.loc[df.index <= 2040])
+    res_70 = mk.original_test(df.loc[(df.index > 2040) & (df.index <= 2070)])
+    res_99 = mk.original_test(df.loc[(df.index > 2070)])
+    print(f'\t2040: {res_40.trend}, {res_40.p}, {res_40.slope}')
+    print(f'\t2070: {res_70.trend}, {res_70.p}, {res_70.slope}')
+    print(f'\t2099: {res_99.trend}, {res_99.p}, {res_99.slope}\n')
+
 
 # fig.savefig(outpath, bbox_inches='tight', facecolor='white')
 

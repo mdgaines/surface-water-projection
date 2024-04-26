@@ -14,7 +14,7 @@ from sklearn.ensemble import RandomForestRegressor
 
 from merf.viz import plot_merf_training_stats
 from sklearn.inspection import plot_partial_dependence
-# import shap
+import shap
 import math
 import time
 
@@ -144,6 +144,51 @@ def get_merf_error_stats(
     r2_test = r2_score(y_test, y_hat_test)
 
     return(mse_test, rmspe_test, mpe_test, r2_test)
+
+
+def get_merf_variable_importance(
+        mrf,
+        test:pd.DataFrame):
+    
+    X_test = test[['PRECIP', 'MAX_TMP', 'PR_AG', 'PR_INT', 'PR_NAT']]
+
+    explainer = shap.TreeExplainer(mrf.trained_fe_model)
+    shap_vals = explainer.shap_values(X_test)
+
+    shap.summary_plot(shap_vals, X_test)
+
+    ABS_SHAP(shap_vals, X_test)
+
+    return shap_vals
+
+
+def ABS_SHAP(df_shap,df):
+    #import matplotlib as plt
+    # Make a copy of the input data
+    shap_v = pd.DataFrame(df_shap)
+    feature_list = df.columns
+    shap_v.columns = feature_list
+    df_v = df.copy().reset_index().drop('index',axis=1)
+    
+    # Determine the correlation in order to plot with different colors
+    corr_list = list()
+    for i in feature_list:
+        b = np.corrcoef(shap_v[i],df_v[i])[1][0]
+        corr_list.append(b)
+    corr_df = pd.concat([pd.Series(feature_list),pd.Series(corr_list)],axis=1).fillna(0)
+    # Make a data frame. Column 1 is the feature, and Column 2 is the correlation coefficient
+    corr_df.columns  = ['Variable','Corr']
+    corr_df['Sign'] = np.where(corr_df['Corr']>0,'#2a8be1','#ed5b89')
+    
+    # Plot it
+    shap_abs = np.abs(shap_v)
+    k=pd.DataFrame(shap_abs.mean()).reset_index()
+    k.columns = ['Variable','SHAP_abs']
+    k2 = k.merge(corr_df,left_on = 'Variable',right_on='Variable',how='inner')
+    k2 = k2.sort_values(by='SHAP_abs',ascending = True)
+    colorlist = k2['Sign']
+    ax = k2.plot.barh(x='Variable',y='SHAP_abs',color = colorlist, figsize=(5,6),legend=False)
+    ax.set_xlabel("SHAP Value\nBlue = Positive Impact\nRed = Negative Impact")
 
 
 def setup_merf_future(
@@ -347,6 +392,9 @@ def main():
     print('RMSPE:', rmspe_test)
     print('MPE:', mpe_test)
     print('R2:', r2_test)
+
+    shap_vals = get_merf_variable_importance(mrf=merf_model, test=test)
+    print(shap_vals)
 
     for gcm in GCM_LST:
         for foresce in FORESCE_LST:
